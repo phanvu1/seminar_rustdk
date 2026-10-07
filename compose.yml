@@ -1,0 +1,60 @@
+# ============================================================
+# RustDesk Server - Docker Compose
+# Đồ án Seminar - Nhóm [Tên nhóm em]
+# Tác giả: [Tên em]
+# Ngày cập nhật: 2026-10-07
+# ============================================================
+# Hướng dẫn:
+#   1. Chạy: docker compose up -d
+#   2. Kiểm tra: docker compose ps
+#   3. Xem log: docker compose logs -f hbbs
+#   4. Dừng: docker compose down
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # hbbs - RustDesk ID/Rendezvous Server
+  # Vai trò: Đăng ký thiết bị, xác thực, thiết lập kết nối
+  # Cổng: 21115 (TCP), 21116 (TCP+UDP), 21118 (WebSocket)
+  # ----------------------------------------------------------
+  hbbs:
+    container_name: hbbs
+    image: rustdesk/rustdesk-server:latest
+    command: hbbs -r 192.168.106.1:21117
+    ports:
+      - "21115:21115"       # NAT type test
+      - "21116:21116"       # ID registration (TCP)
+      - "21116:21116/udp"   # ID registration (UDP)
+      - "21118:21118"       # WebSocket
+    volumes:
+      - ./data:/root        # Lưu key, database
+    restart: unless-stopped
+    depends_on:
+      - hbbr
+    networks:
+      - rustdesk-net
+
+  # ----------------------------------------------------------
+  # hbbr - RustDesk Relay Server
+  # Vai trò: Chuyển tiếp lưu lượng khi không kết nối P2P được
+  # Cổng: 21117 (TCP), 21119 (WebSocket)
+  # ----------------------------------------------------------
+  hbbr:
+    container_name: hbbr
+    image: rustdesk/rustdesk-server:latest
+    command: hbbr
+    ports:
+      - "21117:21117"       # Relay
+      - "21119:21119"       # WebSocket relay
+    volumes:
+      - ./data:/root
+    restart: unless-stopped
+    networks:
+      - rustdesk-net
+
+# ----------------------------------------------------------
+# Network - Mạng riêng cho 2 container
+# ----------------------------------------------------------
+networks:
+  rustdesk-net:
+    driver: bridge

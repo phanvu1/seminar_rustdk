@@ -1,0 +1,13 @@
+# Không đưa dữ liệu server lên Git
+data/
+*.key
+*.pub
+
+# Không đưa file tạm
+*.log
+*.tmp
+.DS_Store
+
+# Không đưa IDE
+.vscode/
+.idea/
