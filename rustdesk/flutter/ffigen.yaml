@@ -1,0 +1,3 @@
+# flutter/ffigen.yaml
+llvm-path:
+  - 'D:\enviroment\LLVM\bin'
