@@ -20,7 +20,7 @@ services:
   hbbs:
     container_name: hbbs
     image: rustdesk/rustdesk-server:latest
-    command: hbbs -r 192.168.106.1:21117
+    command: hbbs -r ${RELAY_ADDR}:21117
     ports:
       - "21115:21115"       # NAT type test
       - "21116:21116"       # ID registration (TCP)
@@ -52,6 +52,33 @@ services:
     networks:
       - rustdesk-net
 
+
+ # --- THÊM MỚI: WireGuard VPN ---
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Ho_Chi_Minh
+      - SERVERURL=192.168.106.1 # IP máy Windows của em
+      - SERVERPORT=51820
+      - PEERS=1                 # Số lượng máy khách (IT) muốn kết nối
+      - PEERDNS=auto
+    volumes:
+      - ./wireguard-config:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - "51820:51820/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+    networks:
+      - rustdesk-net
+      
 # ----------------------------------------------------------
 # Network - Mạng riêng cho 2 container
 # ----------------------------------------------------------

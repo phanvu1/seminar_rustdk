@@ -401,7 +401,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "toi la gay",
+                    "toi ssssssla gay",
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
