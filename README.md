@@ -564,10 +564,10 @@ Các vùng mã nguồn/tài nguyên liên quan đã được làm việc gồm `
 
 > 📸 **CẦN BỔ SUNG ẢNH MINH CHỨNG 3.1 – Giao diện Vynex:**
 ![alt text](image.png) ![alt text](image-1.png)
-> 📸 **CẦN BỔ SUNG ẢNH MINH CHỨNG 3.2 – Kết nối hai chiều:**
-![alt text](image-2.png) *từ vmware sang host*
-![alt text](image-3.png) *từ host sang vmware*
-### 11.3. 🐳 Bạn 2 – Refactor Docker Compose và biến môi trường
+![alt text](image-2.png) 
+*từ vmware sang host*
+![alt text](image-3.png) 
+*từ host sang vmware*
 
 Thư mục triển khai server hiện tại:
 
@@ -610,9 +610,9 @@ docker compose logs --tail=100 wireguard
 
 Kết quả đã quan sát: `hbbs`, `hbbr` và `wireguard` đều ở trạng thái `Up`. Log WireGuard cho biết tunnel `wg0` được kích hoạt.
 
-> 📸 **CẦN BỔ SUNG ẢNH MINH CHỨNG 3.3 – Docker Compose:** ![alt text](image-4.png)
+ ![alt text](image-4.png)
 
-> 📸 **CẦN BỔ SUNG ẢNH MINH CHỨNG 3.4 – WireGuard Server:** ![alt text](image-5.png)
+![alt text](image-5.png)
 ### 11.4. 🔐 WireGuard VPN bằng Docker Desktop
 
 #### Mô hình kiểm thử
@@ -659,7 +659,7 @@ ping -c 4 10.13.13.1
 
 Kết quả kiểm thử đã đạt: **4 gói gửi, 4 gói nhận, 0% packet loss**.
 
-> 📸 **CẦN BỔ SUNG ẢNH MINH CHỨNG 3.5 – Handshake và ping VPN:** ![alt text](image-6.png)
+ ![alt text](image-6.png)
 
 ### 11.5. 🧪 Kiểm chứng định tuyến từ VPN tới RustDesk Server
 
