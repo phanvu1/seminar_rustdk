@@ -11,3 +11,6 @@ data/
 # Không đưa IDE
 .vscode/
 .idea/
+
+# Không đưa file cache của Python
+__pycache__/
