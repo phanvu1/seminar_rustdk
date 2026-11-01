@@ -1,0 +1,23 @@
+{
+    "name": "Vynex - Hệ thống Quản trị & Hỗ trợ Từ xa",
+    "short_name": "Vynex",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0F172A",
+    "theme_color": "#0066FF",
+    "description": "Vynex - Hệ thống Quản trị & Hỗ trợ Từ xa Hiện đại",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "favicon.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "favicon.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

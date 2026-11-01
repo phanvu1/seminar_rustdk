@@ -14,3 +14,7 @@ data/
 
 # Không đưa file cache của Python
 __pycache__/
+
+# Flutter
+.dart_tool/
+build/
