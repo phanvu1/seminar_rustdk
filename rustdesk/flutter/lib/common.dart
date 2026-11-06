@@ -27,6 +27,7 @@ import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
+import 'package:flutter_hbb/vynex_permission_guard.dart';
 
 import '../consts.dart';
 import 'common/widgets/overlay.dart';
@@ -2336,6 +2337,14 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
       case '--relay':
         forceRelay = true;
         break;
+      case '--token':
+        VynexPermissionGuard.setLaunchSession(token: args[i + 1]);
+        i++;
+        break;
+      case '--it-user':
+        VynexPermissionGuard.setLaunchSession(itUser: args[i + 1]);
+        i++;
+        break;
       default:
         break;
     }
@@ -2343,7 +2352,15 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
   if (type != null && id != null) {
     switch (type) {
       case UriLinkType.remoteDesktop:
-        Future.delayed(Duration.zero, () {
+        Future.delayed(Duration.zero, () async {
+          final authCheck = await VynexPermissionGuard.verifyPermission(targetId: id!);
+          if (!authCheck.allowed) {
+            final mainContext = rootNavigatorKey.currentContext;
+            if (mainContext != null) {
+              VynexPermissionGuard.showAccessDeniedDialog(mainContext, authCheck.reason);
+            }
+            return;
+          }
           rustDeskWinManager.newRemoteDesktop(id!,
               password: password,
               switchUuid: switchUuid,
@@ -2580,6 +2597,21 @@ connect(BuildContext context, String id,
     String? connToken,
     bool? isSharedPassword}) async {
   if (id == '') return;
+
+  // =========================================================================
+  // VYNEX PERMISSION GUARD (CHỐT CHẶN BẢO MẬT & CHỐNG VƯỢT QUYỀN - ANTI-BYPASS)
+  // Nếu người dùng tự mở Vynex Client/RustDesk nhập tay ID và Pass khi CHƯA
+  // được cấp quyền trên Vynex Manager, hệ thống lập tức hủy phiên kết nối.
+  // =========================================================================
+  final targetCleanId = id.replaceAll(' ', '');
+  final authCheck = await VynexPermissionGuard.verifyPermission(
+    targetId: targetCleanId,
+    token: connToken,
+  );
+  if (!authCheck.allowed) {
+    VynexPermissionGuard.showAccessDeniedDialog(context, authCheck.reason);
+    return; // ABORT: Chặn đứng kết nối, bảo vệ máy đích tuyệt đối
+  }
   if (!isDesktop || desktopType == DesktopType.main) {
     try {
       if (Get.isRegistered<IDTextEditingController>()) {

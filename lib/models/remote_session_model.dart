@@ -76,4 +76,12 @@ class RemoteSessionModel {
       'status': status,
     };
   }
+
+  // Tiện ích getter tương thích
+  String get itUserName => itName;
+  String get targetUserName => targetName;
+  DateTime get startTime => startedAt;
+  String get durationFormatted => durationSeconds != null
+      ? '${durationSeconds! ~/ 60}m ${durationSeconds! % 60}s'
+      : 'Đang chạy';
 }

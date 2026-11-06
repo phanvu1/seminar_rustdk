@@ -1,5 +1,5 @@
-name: vynex_web
-description: "Vynex - Hệ thống Quản trị & Hỗ trợ Từ xa trên nền tảng Web"
+name: vynex_manager
+description: "Vynex Manager - Hệ thống Quản trị & Hỗ trợ Từ xa Desktop Windows (.exe)"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -13,7 +13,6 @@ dependencies:
   http: ^1.2.2
   provider: ^6.1.2
   intl: ^0.19.0
-  google_fonts: ^6.2.1
   fl_chart: ^0.69.0
 
 dev_dependencies:

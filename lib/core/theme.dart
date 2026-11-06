@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'constants.dart';
 
 class AppTheme {
+  static const String defaultFont = 'Segoe UI';
+
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
+    fontFamily: defaultFont,
     brightness: Brightness.light,
     primaryColor: AppConstants.primaryBlue,
     scaffoldBackgroundColor: const Color(0xFFF1F5F9), // Slate 100
@@ -17,26 +19,30 @@ class AppTheme {
       onPrimary: Colors.white,
       onSurface: Color(0xFF1E293B),
     ),
-    textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme).copyWith(
-      titleLarge: GoogleFonts.inter(
+    textTheme: const TextTheme(
+      titleLarge: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 20,
         fontWeight: FontWeight.w700,
-        color: const Color(0xFF0F172A),
+        color: Color(0xFF0F172A),
       ),
-      titleMedium: GoogleFonts.inter(
+      titleMedium: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: const Color(0xFF1E293B),
+        color: Color(0xFF1E293B),
       ),
-      bodyLarge: GoogleFonts.inter(
+      bodyLarge: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 14,
         fontWeight: FontWeight.normal,
-        color: const Color(0xFF334155),
+        color: Color(0xFF334155),
       ),
-      bodyMedium: GoogleFonts.inter(
+      bodyMedium: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 13,
         fontWeight: FontWeight.normal,
-        color: const Color(0xFF64748B),
+        color: Color(0xFF64748B),
       ),
     ),
     dividerTheme: const DividerThemeData(
@@ -72,6 +78,7 @@ class AppTheme {
 
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
+    fontFamily: defaultFont,
     brightness: Brightness.dark,
     primaryColor: AppConstants.primaryBlue,
     scaffoldBackgroundColor: const Color(0xFF0B132B), // Very dark navy
@@ -84,26 +91,30 @@ class AppTheme {
       onPrimary: Colors.white,
       onSurface: Color(0xFFF8FAFC),
     ),
-    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
-      titleLarge: GoogleFonts.inter(
+    textTheme: const TextTheme(
+      titleLarge: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 20,
         fontWeight: FontWeight.w700,
-        color: const Color(0xFFF8FAFC),
+        color: Color(0xFFF8FAFC),
       ),
-      titleMedium: GoogleFonts.inter(
+      titleMedium: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: const Color(0xFFE2E8F0),
+        color: Color(0xFFE2E8F0),
       ),
-      bodyLarge: GoogleFonts.inter(
+      bodyLarge: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 14,
         fontWeight: FontWeight.normal,
-        color: const Color(0xFFCBD5E1),
+        color: Color(0xFFCBD5E1),
       ),
-      bodyMedium: GoogleFonts.inter(
+      bodyMedium: TextStyle(
+        fontFamily: defaultFont,
         fontSize: 13,
         fontWeight: FontWeight.normal,
-        color: const Color(0xFF94A3B8),
+        color: Color(0xFF94A3B8),
       ),
     ),
     dividerTheme: const DividerThemeData(

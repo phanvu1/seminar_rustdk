@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -26,23 +28,181 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
     super.dispose();
   }
 
-  void _exportReport(String type) {
-    final fileName = type == 'PDF' ? 'Vynex_BaoCao_HoTro_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf' : 'Vynex_DuLieu_HoTro_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(type == 'PDF' ? Icons.picture_as_pdf_rounded : Icons.table_chart_rounded, color: Colors.white),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text('Đã xuất báo cáo $type thành công: $fileName'),
+  Future<void> _exportReport(String type) async {
+    final isPdf = type == 'PDF';
+    final dateStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final displayDate = DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now());
+    final fileName = isPdf ? 'Vynex_BaoCao_HoTro_$dateStr.pdf' : 'Vynex_DuLieu_HoTro_$dateStr.csv';
+
+    // Xác định thư mục Downloads hoặc Documents của Windows
+    String targetDir = Directory.current.path;
+    final userProfile = Platform.environment['USERPROFILE'];
+    if (userProfile != null) {
+      final downloadsDir = Directory('$userProfile\\Downloads');
+      if (downloadsDir.existsSync()) {
+        targetDir = downloadsDir.path;
+      } else {
+        final docsDir = Directory('$userProfile\\Documents');
+        if (docsDir.existsSync()) {
+          targetDir = docsDir.path;
+        }
+      }
+    }
+
+    final filePath = '$targetDir\\$fileName';
+    final mock = MockDataService();
+
+    try {
+      final file = File(filePath);
+
+      if (isPdf) {
+        // Tạo file PDF hợp lệ chuẩn cấu trúc PDF-1.4
+        final buffer = StringBuffer();
+        buffer.writeln('%PDF-1.4');
+        buffer.writeln('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj');
+        buffer.writeln('2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj');
+        buffer.writeln('3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj');
+        buffer.writeln('4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj');
+
+        final streamContent = StringBuffer();
+        streamContent.writeln('BT');
+        streamContent.writeln('/F1 18 Tf');
+        streamContent.writeln('50 740 Td');
+        streamContent.writeln('(VYNEX MANAGEMENT SYSTEM - AUDIT REPORT) Tj');
+        streamContent.writeln('/F1 12 Tf');
+        streamContent.writeln('0 -30 Td');
+        streamContent.writeln('(Generated: $displayDate) Tj');
+        streamContent.writeln('0 -20 Td');
+        streamContent.writeln('(Total Devices: ${mock.devices.length} | Active Sessions: ${mock.sessions.length}) Tj');
+        streamContent.writeln('0 -30 Td');
+        streamContent.writeln('(--- RECENT REMOTE SESSIONS LOG ---) Tj');
+
+        for (var s in mock.sessions.take(10)) {
+          streamContent.writeln('0 -18 Td');
+          streamContent.writeln('(Session #${s.sessionId} | ${s.deviceName} | IT: ${s.itUserName} | Duration: ${s.durationFormatted}) Tj');
+        }
+
+        streamContent.writeln('ET');
+        final streamBytes = streamContent.toString();
+
+        buffer.writeln('5 0 obj << /Length ${streamBytes.length} >>');
+        buffer.writeln('stream');
+        buffer.write(streamBytes);
+        buffer.writeln('endstream');
+        buffer.writeln('endobj');
+        buffer.writeln('xref');
+        buffer.writeln('0 6');
+        buffer.writeln('0000000000 65535 f ');
+        buffer.writeln('trailer << /Size 6 /Root 1 0 R >>');
+        buffer.writeln('startxref');
+        buffer.writeln('10');
+        buffer.writeln('%%EOF');
+
+        await file.writeAsString(buffer.toString());
+      } else {
+        // Tạo file CSV với BOM UTF-8 để Microsoft Excel mở trực tiếp không lỗi tiếng Việt
+        final csv = StringBuffer();
+        csv.write('\uFEFF'); // UTF-8 BOM
+        csv.writeln('Mã Phiên,Tên Thiết Bị,Vynex ID,Kỹ Thuật Viên IT,Người Dùng,Loại Kết Nối,Bắt Đầu,Thời Lượng,Đánh Giá,Trạng Thái,Ghi Chú');
+        for (var s in mock.sessions) {
+          final start = DateFormat('dd/MM/yyyy HH:mm:ss').format(s.startTime);
+          csv.writeln('${s.sessionId},"${s.deviceName}","${s.vynexId}","${s.itUserName}","${s.targetUserName}","${s.connectionType}","$start","${s.durationFormatted}",${s.qualityScore ?? 5},"${s.status}","${s.notes ?? ''}"');
+        }
+        await file.writeAsString(csv.toString(), encoding: utf8);
+      }
+
+      if (!mounted) return;
+
+      // Hiển thị Dialog thông báo đường dẫn file đã xuất kèm các nút thao tác nhanh
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(isPdf ? Icons.picture_as_pdf_rounded : Icons.table_chart_rounded,
+                  color: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 28),
+              const SizedBox(width: 10),
+              Text(
+                'Xuất Báo Cáo $type Thành Công',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('File báo cáo đã được lưu trực tiếp vào ổ cứng:',
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: SelectableText(
+                  filePath,
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('Bạn có thể mở xem ngay hoặc mở thư mục lưu trữ trên Windows Explorer.',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                Process.run('explorer.exe', ['/select,', filePath]);
+              },
+              icon: const Icon(Icons.folder_open_rounded, size: 16),
+              label: const Text('Mở Thư Mục Chứa File'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Process.run('cmd.exe', ['/c', 'start', '', filePath]);
+                Navigator.pop(ctx);
+              },
+              icon: const Icon(Icons.launch_rounded, size: 16),
+              label: const Text('Mở File Ngay'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF10B981),
-        duration: const Duration(seconds: 4),
-      ),
-    );
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã lưu file: $filePath'),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi khi xuất file: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   @override

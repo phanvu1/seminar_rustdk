@@ -15,17 +15,18 @@ services:
   # ----------------------------------------------------------
   # hbbs - RustDesk ID/Rendezvous Server
   # Vai trò: Đăng ký thiết bị, xác thực, thiết lập kết nối
-  # Cổng: 21115 (TCP), 21116 (TCP+UDP), 21118 (WebSocket)
+  # Cổng: Cô lập trên giao diện VPN WireGuard 10.13.13.1
   # ----------------------------------------------------------
   hbbs:
     container_name: hbbs
     image: rustdesk/rustdesk-server:latest
-    command: hbbs -r ${RELAY_ADDR}:21117
+    command: hbbs -r 10.13.13.1:21117
     ports:
-      - "21115:21115"       # NAT type test
-      - "21116:21116"       # ID registration (TCP)
-      - "21116:21116/udp"   # ID registration (UDP)
-      - "21118:21118"       # WebSocket
+      # CÔ LẬP CỔNG: Chỉ cho phép lưu lượng đi qua mạng WireGuard VPN 10.13.13.1 (Khóa mạng LAN vật lý)
+      - "10.13.13.1:21115:21115"       # NAT type test (chỉ qua VPN)
+      - "10.13.13.1:21116:21116"       # ID registration TCP (chỉ qua VPN)
+      - "10.13.13.1:21116:21116/udp"   # ID registration UDP (chỉ qua VPN)
+      - "10.13.13.1:21118:21118"       # WebSocket (chỉ qua VPN)
     volumes:
       - ./data:/root        # Lưu key, database
     restart: unless-stopped
@@ -37,15 +38,16 @@ services:
   # ----------------------------------------------------------
   # hbbr - RustDesk Relay Server
   # Vai trò: Chuyển tiếp lưu lượng khi không kết nối P2P được
-  # Cổng: 21117 (TCP), 21119 (WebSocket)
+  # Cổng: Cô lập trên giao diện VPN WireGuard 10.13.13.1
   # ----------------------------------------------------------
   hbbr:
     container_name: hbbr
     image: rustdesk/rustdesk-server:latest
     command: hbbr
     ports:
-      - "21117:21117"       # Relay
-      - "21119:21119"       # WebSocket relay
+      # CÔ LẬP CỔNG: Chỉ cho phép relay qua mạng WireGuard VPN 10.13.13.1
+      - "10.13.13.1:21117:21117"       # Relay (chỉ qua VPN)
+      - "10.13.13.1:21119:21119"       # WebSocket relay (chỉ qua VPN)
     volumes:
       - ./data:/root
     restart: unless-stopped
@@ -53,7 +55,7 @@ services:
       - rustdesk-net
 
 
- # --- THÊM MỚI: WireGuard VPN ---
+ # --- WIREGUARD VPN CHO 20 NHÂN SỰ TẠI 3 TRỤ SỞ ---
   wireguard:
     image: linuxserver/wireguard:latest
     container_name: wireguard
@@ -64,10 +66,11 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Ho_Chi_Minh
-      - SERVERURL=192.168.106.1 # IP máy Windows của em
+      - SERVERURL=192.168.106.1 # Endpoint IP Public / LAN Host
       - SERVERPORT=51820
-      - PEERS=1                 # Số lượng máy khách (IT) muốn kết nối
+      - PEERS=20                # SINH ĐỦ 20 CẤU HÌNH & 20 PRIVATE KEYS (peer1 -> peer20, 10.13.13.2 -> 10.13.13.21)
       - PEERDNS=auto
+      - INTERNAL_SUBNET=10.13.13.0/24
     volumes:
       - ./wireguard-config:/config
       - /lib/modules:/lib/modules

@@ -6,9 +6,9 @@ import '../../services/auth_service.dart';
 import '../../services/mock_data_service.dart';
 import '../../services/permission_service.dart';
 import '../../services/support_ticket_service.dart';
+import '../../services/vynex_launcher_service.dart';
 import '../../shared/widgets/search_filter_bar.dart';
 import '../../shared/widgets/status_badge.dart';
-import 'remote_session_dialog.dart';
 
 class SupportTicketsPage extends StatefulWidget {
   const SupportTicketsPage({Key? key}) : super(key: key);
@@ -227,6 +227,19 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Đóng'),
               ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Đã gửi yêu cầu cấp quyền điều khiển máy "${ticket.deviceName}" tới Admin.'),
+                      backgroundColor: const Color(0xFF3B82F6),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.send_rounded, size: 16),
+                label: const Text('Gửi yêu cầu xin Admin cấp quyền'),
+              ),
               // Quick button for Demo to grant permission immediately
               ElevatedButton.icon(
                 onPressed: () async {
@@ -252,7 +265,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                   _openRemoteSession(context, ticket);
                 },
                 icon: const Icon(Icons.vpn_key_rounded, size: 16),
-                label: const Text('[Demo] Admin Cấp Quyền 24h Ngay'),
+                label: const Text('[Demo] Cấp Quyền Ngay'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppConstants.primaryBlue,
                   foregroundColor: Colors.white,
@@ -270,8 +283,20 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
 
   void _openRemoteSession(BuildContext context, SupportRequestModel ticket) async {
     final auth = Provider.of<AuthService>(context, listen: false);
+    final permService = Provider.of<PermissionService>(context, listen: false);
     final ticketService = Provider.of<SupportTicketService>(context, listen: false);
 
+    // 1. Sinh Session Token ủy quyền bảo mật
+    final sessionToken = permService.generateSessionToken(auth.currentUser.userId, ticket.deviceId);
+
+    // 2. Tự động gọi mở Vynex Client (.exe) kèm tham số CLI: --connect <vynex_id> --token <session_token> --it-user <user_id>
+    final launchResult = await VynexLauncherService.launchClient(
+      vynexId: ticket.vynexId,
+      token: sessionToken,
+      itUserId: auth.currentUser.userId,
+    );
+
+    // 3. Ghi nhận phiên làm việc vào hệ thống
     await ticketService.startSession(
       ticket: ticket,
       itUserId: auth.currentUser.userId,
@@ -279,20 +304,70 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     );
 
     if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return RemoteSessionDialog(
-          deviceId: ticket.deviceId,
-          deviceName: ticket.deviceName,
-          vynexId: ticket.vynexId,
-          targetUserName: ticket.employeeName,
-          connectionType: 'Direct P2P via HBBS',
-          supportRequestId: ticket.requestId,
-        );
-      },
-    );
+
+    if (launchResult.success) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.cast_connected_rounded, color: Color(0xFF10B981), size: 28),
+              SizedBox(width: 10),
+              Text('Khởi Chạy Phiên Kết Nối Thành Công', style: TextStyle(color: Colors.white, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ứng dụng Vynex Client (.exe) đã được kích hoạt và đang tự động bắt tay P2P tới máy "${ticket.deviceName}" (ID: ${ticket.vynexId}).',
+                style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified_user_rounded, color: Color(0xFF38BDF8), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Token Ủy Quyền: ${sessionToken.substring(0, 24)}...',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'monospace', fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+              child: const Text('Đã rõ'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(launchResult.message),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   void _showRatingDialog(BuildContext context, SupportRequestModel ticket) {

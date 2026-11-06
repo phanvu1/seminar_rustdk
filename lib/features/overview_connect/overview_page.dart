@@ -1,10 +1,13 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants.dart';
+import '../../services/auth_service.dart';
+import '../../services/permission_service.dart';
 import '../../services/mock_data_service.dart';
+import '../../services/vynex_launcher_service.dart';
 import '../../shared/widgets/status_badge.dart';
-import '../support_tickets/remote_session_dialog.dart';
 
 class OverviewPage extends StatefulWidget {
   final ValueChanged<String>? onNavigate;
@@ -44,7 +47,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  void _connectToRemote(String targetId, {bool isFileTransfer = false}) {
+  void _connectToRemote(String targetId, {bool isFileTransfer = false}) async {
     if (targetId.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng nhập Vynex ID hợp lệ')),
@@ -52,25 +55,97 @@ class _OverviewPageState extends State<OverviewPage> {
       return;
     }
 
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final permService = Provider.of<PermissionService>(context, listen: false);
     final mock = MockDataService();
     final device = mock.devices.firstWhere(
       (d) => d.vynexId.replaceAll(' ', '') == targetId.replaceAll(' ', ''),
       orElse: () => mock.devices.first,
     );
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return RemoteSessionDialog(
-          deviceId: device.deviceId,
-          deviceName: device.name,
-          vynexId: device.vynexId,
-          targetUserName: device.userName ?? 'Nhân viên',
-          connectionType: isFileTransfer ? 'File Transfer' : 'Remote Desktop (Direct)',
-        );
-      },
+    // Kiểm tra quyền trên bảng Permissions
+    final hasPerm = permService.hasPermission(auth.currentUser.userId, device.deviceId);
+    if (!hasPerm) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
+              SizedBox(width: 10),
+              Text('Chặn Kết Nối Bảo Mật (RBAC)', style: TextStyle(color: Colors.white, fontSize: 16)),
+            ],
+          ),
+          content: Text(
+            'Bạn không có quyền thực hiện kết nối tới thiết bị "${device.name}" (ID: ${device.vynexId}).\n'
+            'Chính sách Vynex yêu cầu quản trị viên cấp quyền trước khi khởi tạo phiên.',
+            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await permService.grantPermission(
+                  itUserId: auth.currentUser.userId,
+                  itName: auth.currentUser.fullName,
+                  deviceId: device.deviceId,
+                  deviceName: device.name,
+                  vynexId: device.vynexId,
+                  permissionType: 'control',
+                  durationType: '24h',
+                );
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                _connectToRemote(targetId, isFileTransfer: isFileTransfer);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+              child: const Text('[Demo] Cấp Quyền & Kết Nối'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Đã có quyền hợp lệ -> Sinh Session Token và gọi Vynex Client (.exe)
+    final sessionToken = permService.generateSessionToken(auth.currentUser.userId, device.deviceId);
+    final launchResult = await VynexLauncherService.launchClient(
+      vynexId: device.vynexId,
+      token: sessionToken,
+      itUserId: auth.currentUser.userId,
     );
+
+    if (!mounted) return;
+
+    if (launchResult.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Đã kích hoạt Vynex Client (.exe) kết nối máy ${device.name} (${device.vynexId})'),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(launchResult.message),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   @override

@@ -25,6 +25,22 @@ INSERT INTO Roles (name, description, permissions) VALUES
     ('user', 'Nhân viên', '["request_support"]'),
     ('manager', 'Quản lý', '["view_reports"]');
 
+/* 00 Branches: Quản lý 3 Trụ sở A, B, C cho 20 nhân sự */
+CREATE TABLE IF NOT EXISTS Branches (
+    branch_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(20) NOT NULL,
+    address VARCHAR(255) NULL,
+    ip_subnet VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT UQ_Branches_Code UNIQUE (code)
+) ENGINE=InnoDB;
+
+INSERT INTO Branches (name, code, address, ip_subnet) VALUES
+    ('Trụ sở A - Hà Nội', 'BRANCH_A', 'Hà Nội', '10.13.13.0/24'),
+    ('Trụ sở B - Đà Nẵng', 'BRANCH_B', 'Đà Nẵng', '10.13.14.0/24'),
+    ('Trụ sở C - TP. Hồ Chí Minh', 'BRANCH_C', 'TP. Hồ Chí Minh', '10.13.15.0/24');
+
 /* 01 Departments: manager FK is added after Users to resolve circular dependency */
 CREATE TABLE Departments (
     department_id INT AUTO_INCREMENT PRIMARY KEY,

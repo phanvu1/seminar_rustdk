@@ -4,7 +4,7 @@ class AppConstants {
   // Brand identity
   static const String appName = 'Vynex';
   static const String appFullName = 'Vynex - Hệ thống Quản trị & Hỗ trợ Từ xa';
-  static const String appVersion = 'v1.0.0 (Web)';
+  static const String appVersion = 'v1.0.0 (Windows Desktop)';
 
   // Brand Colors
   static const Color primaryBlue = Color(0xFF0066FF); // Xanh Vynex chủ đạo

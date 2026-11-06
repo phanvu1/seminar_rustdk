@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import '../../core/constants.dart';
 import '../../core/network/api_service.dart';
 import '../../models/device_model.dart';
+import '../../services/auth_service.dart';
+import '../../services/permission_service.dart';
 import '../../services/mock_data_service.dart';
+import '../../services/vynex_launcher_service.dart';
 import '../../shared/widgets/search_filter_bar.dart';
 import '../../shared/widgets/status_badge.dart';
-import '../support_tickets/remote_session_dialog.dart';
 
 class DevicesPage extends StatefulWidget {
   const DevicesPage({Key? key}) : super(key: key);
@@ -467,20 +469,80 @@ class _DevicesPageState extends State<DevicesPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           ElevatedButton.icon(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (ctx) {
-                                  return RemoteSessionDialog(
-                                    deviceId: dev.deviceId,
-                                    deviceName: dev.name,
-                                    vynexId: dev.vynexId,
-                                    targetUserName: dev.userName ?? 'Nhân viên',
-                                    connectionType: 'Direct P2P via HBBS',
-                                  );
-                                },
+                            onPressed: () async {
+                              final auth = Provider.of<AuthService>(context, listen: false);
+                              final permService = Provider.of<PermissionService>(context, listen: false);
+                              final hasPerm = permService.hasPermission(auth.currentUser.userId, dev.deviceId);
+
+                              if (!hasPerm) {
+                                showDialog(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    backgroundColor: const Color(0xFF1E293B),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
+                                        SizedBox(width: 8),
+                                        Text('Chưa Có Quyền Truy Cập', style: TextStyle(color: Colors.white, fontSize: 16)),
+                                      ],
+                                    ),
+                                    content: Text(
+                                      'Bạn chưa được cấp quyền điều khiển máy "${dev.name}" (${dev.vynexId}).',
+                                      style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c),
+                                        child: const Text('Đóng'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () async {
+                                          await permService.grantPermission(
+                                            itUserId: auth.currentUser.userId,
+                                            itName: auth.currentUser.fullName,
+                                            deviceId: dev.deviceId,
+                                            deviceName: dev.name,
+                                            vynexId: dev.vynexId,
+                                            permissionType: 'control',
+                                            durationType: '24h',
+                                          );
+                                          if (!mounted) return;
+                                          Navigator.pop(c);
+                                        },
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+                                        child: const Text('[Demo] Cấp Quyền 24h'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final token = permService.generateSessionToken(auth.currentUser.userId, dev.deviceId);
+                              final launchResult = await VynexLauncherService.launchClient(
+                                vynexId: dev.vynexId,
+                                token: token,
+                                itUserId: auth.currentUser.userId,
                               );
+
+                              if (!mounted) return;
+
+                              if (launchResult.success) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Đã kích hoạt Vynex Client (.exe) kết nối tới máy ${dev.name} (${dev.vynexId})'),
+                                    backgroundColor: const Color(0xFF10B981),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(launchResult.message),
+                                    backgroundColor: const Color(0xFFEF4444),
+                                  ),
+                                );
+                              }
                             },
                             icon: const Icon(Icons.cast_connected, size: 14),
                             label: const Text('Kết Nối'),

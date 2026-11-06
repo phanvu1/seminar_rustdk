@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../core/network/api_service.dart';
 import '../models/permission_model.dart';
 import 'mock_data_service.dart';
@@ -29,6 +30,31 @@ class PermissionService extends ChangeNotifier {
         p.userId == itUserId &&
         p.deviceId == deviceId &&
         p.isValid);
+  }
+
+  /// Sinh Session Token ủy quyền phiên kết nối từ Vynex Manager sang Vynex Client
+  String generateSessionToken(int itUserId, int deviceId) {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return 'vynex_token_${deviceId}_${itUserId}_$timestamp';
+  }
+
+  /// Xác thực quyền kết nối với Backend hoặc Local Fallback
+  Future<bool> verifyPermissionOnline(int itUserId, int deviceId) async {
+    // 1. Kiểm tra trực tiếp trên cache / mock data service
+    final localValid = hasPermission(itUserId, deviceId);
+    if (!localValid) return false;
+
+    // 2. Kiểm tra thêm qua backend API nếu có kết nối
+    try {
+      final base = ApiService().baseUrl;
+      final url = Uri.parse('$base/api/permissions/verify?user_id=$itUserId&device_id=$deviceId');
+      final res = await http.get(url).timeout(const Duration(seconds: 2));
+      if (res.statusCode == 200) {
+        // Parse response
+        return true;
+      }
+    } catch (_) {}
+    return localValid;
   }
 
   PermissionModel? getActivePermission(int itUserId, int deviceId) {
