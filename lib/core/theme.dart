@@ -4,11 +4,8 @@ import 'constants.dart';
 class AppTheme {
   static const String defaultFont = 'Segoe UI';
   static const List<String> fontFallbacks = [
-    'Segoe UI',
     'Roboto',
     'Arial',
-    'Microsoft Sans Serif',
-    'Tahoma',
     'sans-serif',
   ];
 
@@ -143,7 +140,14 @@ class AppTheme {
       onPrimary: Colors.white,
       onSurface: Color(0xFF1E293B),
     ),
-    textTheme: _buildTextTheme(isDark: false),
+    textTheme: _buildTextTheme(isDark: false).apply(
+      fontFamily: defaultFont,
+      fontFamilyFallback: fontFallbacks,
+    ),
+    primaryTextTheme: _buildTextTheme(isDark: false).apply(
+      fontFamily: defaultFont,
+      fontFamilyFallback: fontFallbacks,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.white,
       foregroundColor: Color(0xFF0F172A),
@@ -279,7 +283,14 @@ class AppTheme {
       onPrimary: Colors.white,
       onSurface: Color(0xFFF8FAFC),
     ),
-    textTheme: _buildTextTheme(isDark: true),
+    textTheme: _buildTextTheme(isDark: true).apply(
+      fontFamily: defaultFont,
+      fontFamilyFallback: fontFallbacks,
+    ),
+    primaryTextTheme: _buildTextTheme(isDark: true).apply(
+      fontFamily: defaultFont,
+      fontFamilyFallback: fontFallbacks,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: Color(0xFF1E293B),
       foregroundColor: Color(0xFFF8FAFC),

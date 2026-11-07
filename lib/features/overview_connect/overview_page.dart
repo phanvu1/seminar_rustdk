@@ -68,21 +68,34 @@ class _OverviewPageState extends State<OverviewPage> {
     if (!hasPerm) {
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
-              SizedBox(width: 10),
-              Text('Chặn Kết Nối Bảo Mật (RBAC)', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ],
-          ),
-          content: Text(
-            'Bạn không có quyền thực hiện kết nối tới thiết bị "${device.name}" (ID: ${device.vynexId}).\n'
-            'Chính sách Vynex yêu cầu quản trị viên cấp quyền trước khi khởi tạo phiên.',
-            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.4),
-          ),
+        builder: (ctx) {
+          final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkDialog ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
+                const SizedBox(width: 10),
+                Text(
+                  'Chặn Kết Nối Bảo Mật (RBAC)',
+                  style: TextStyle(
+                    color: isDarkDialog ? Colors.white : const Color(0xFF0F172A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'Bạn không có quyền thực hiện kết nối tới thiết bị "${device.name}" (ID: ${device.vynexId}).\n'
+              'Chính sách Vynex yêu cầu quản trị viên cấp quyền trước khi khởi tạo phiên.',
+              style: TextStyle(
+                color: isDarkDialog ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -107,9 +120,10 @@ class _OverviewPageState extends State<OverviewPage> {
               child: const Text('[Demo] Cấp Quyền & Kết Nối'),
             ),
           ],
-        ),
-      );
-      return;
+        );
+      },
+    );
+    return;
     }
 
     // Đã có quyền hợp lệ -> Sinh Session Token và gọi Vynex Client (.exe)

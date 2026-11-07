@@ -317,57 +317,77 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     if (launchResult.success) {
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.cast_connected_rounded, color: Color(0xFF10B981), size: 28),
-              SizedBox(width: 10),
-              Text('Khởi Chạy Phiên Kết Nối Thành Công', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Ứng dụng Vynex Client (.exe) đã được kích hoạt và đang tự động bắt tay P2P tới máy "${ticket.deviceName}" (ID: ${ticket.vynexId}).',
-                style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.4),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.verified_user_rounded, color: Color(0xFF38BDF8), size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Token Ủy Quyền: ${sessionToken.substring(0, 24)}...',
-                        style: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'monospace', fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
-              child: const Text('Đã rõ'),
+        builder: (ctx) {
+          final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkDialog ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
             ),
-          ],
-        ),
+            title: Row(
+              children: [
+                const Icon(Icons.cast_connected_rounded, color: Color(0xFF10B981), size: 28),
+                const SizedBox(width: 10),
+                Text(
+                  'Khởi Chạy Phiên Kết Nối Thành Công',
+                  style: TextStyle(
+                    color: isDarkDialog ? Colors.white : const Color(0xFF0F172A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ứng dụng Vynex Client (.exe) đã được kích hoạt và đang tự động bắt tay P2P tới máy "${ticket.deviceName}" (ID: ${ticket.vynexId}).',
+                  style: TextStyle(
+                    color: isDarkDialog ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDarkDialog ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDarkDialog ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified_user_rounded, color: Color(0xFF38BDF8), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Token Ủy Quyền: ${sessionToken.substring(0, 24)}...',
+                          style: TextStyle(
+                            color: isDarkDialog ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            fontFamily: 'Consolas',
+                            fontFamilyFallback: const ['Courier New', 'monospace', 'Segoe UI'],
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+                child: const Text('Đã rõ'),
+              ),
+            ],
+          );
+        },
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

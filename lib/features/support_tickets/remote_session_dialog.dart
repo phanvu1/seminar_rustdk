@@ -269,7 +269,8 @@ class _RemoteSessionDialogState extends State<RemoteSessionDialog> {
                                   '[INFO] Print Spooler service status: OK (Restarted)',
                                   style: TextStyle(
                                     color: Color(0xFFCBD5E1),
-                                    fontFamily: 'monospace',
+                                    fontFamily: 'Consolas',
+                                    fontFamilyFallback: ['Courier New', 'monospace', 'Segoe UI'],
                                     fontSize: 11,
                                     height: 1.4,
                                   ),

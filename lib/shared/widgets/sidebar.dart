@@ -22,14 +22,14 @@ class Sidebar extends StatelessWidget {
   final String activeRoute;
   final ValueChanged<String> onSelectRoute;
   final bool isCollapsed;
-  final bool isDark;
+  final bool? isDark;
 
   const Sidebar({
     Key? key,
     required this.activeRoute,
     required this.onSelectRoute,
     this.isCollapsed = false,
-    this.isDark = true,
+    this.isDark,
   }) : super(key: key);
 
   static List<SidebarItem> getMenuItemsForRole(UserRole role) {
@@ -108,15 +108,24 @@ class Sidebar extends StatelessWidget {
     final activeRole = auth.activeRole;
     final width = isCollapsed ? 76.0 : 260.0;
 
+    // Tự động đồng bộ theo Theme hiện tại hoặc cờ isDark (Lỗi 2)
+    final themeIsDark = isDark ?? (Theme.of(context).brightness == Brightness.dark);
+
     final visibleItems = getMenuItemsForRole(activeRole);
+
+    // Bảng màu phân định rạch ròi theo Light Mode vs Dark Mode chuẩn theo yêu cầu Lỗi 2
+    final bgColor = themeIsDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor = themeIsDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final dividerColor = themeIsDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final hoverColor = themeIsDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: width,
       decoration: BoxDecoration(
-        color: const Color(0xFF0B132B), // Modern Deep Navy
-        border: const Border(
-          right: BorderSide(color: Color(0xFF1E293B), width: 1),
+        color: bgColor,
+        border: Border(
+          right: BorderSide(color: borderColor, width: 1),
         ),
       ),
       child: Column(
@@ -128,10 +137,10 @@ class Sidebar extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 18 : 20),
             alignment: Alignment.centerLeft,
             child: isCollapsed
-                ? const VynexLogo(size: 32, showText: false, isDark: true)
-                : const VynexLogo(size: 32, showText: true, isDark: true),
+                ? VynexLogo(size: 32, showText: false, isDark: themeIsDark)
+                : VynexLogo(size: 32, showText: true, isDark: themeIsDark),
           ),
-          const Divider(color: Color(0xFF1E293B), height: 1),
+          Divider(color: dividerColor, height: 1),
 
           const SizedBox(height: 12),
 
@@ -144,6 +153,33 @@ class Sidebar extends StatelessWidget {
                 final item = visibleItems[index];
                 final isSelected = activeRoute == item.id;
 
+                // Màu sắc menu item động theo trạng thái theme chuẩn Lỗi 2:
+                // Light: Active nền #EFF6FF, text/icon #0066FF; Unselected icon #475569, text #475569
+                // Dark: Active nền #0066FF.withOpacity(0.15), text sáng, icon #38BDF8; Unselected #94A3B8
+                final Color itemBgColor;
+                final Color itemIconColor;
+                final Color itemTextColor;
+
+                if (isSelected) {
+                  itemBgColor = themeIsDark
+                      ? const Color(0xFF0066FF).withOpacity(0.15)
+                      : const Color(0xFFEFF6FF); // Xanh nhạt khi light
+                  itemIconColor = themeIsDark
+                      ? const Color(0xFF38BDF8)
+                      : const Color(0xFF0066FF); // Xanh Vynex khi light
+                  itemTextColor = themeIsDark
+                      ? Colors.white
+                      : const Color(0xFF0066FF); // Xanh Vynex khi light
+                } else {
+                  itemBgColor = Colors.transparent;
+                  itemIconColor = themeIsDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF475569); // Xám đậm khi light
+                  itemTextColor = themeIsDark
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFF475569); // Xám đậm khi light
+                }
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Material(
@@ -151,15 +187,23 @@ class Sidebar extends StatelessWidget {
                     child: InkWell(
                       onTap: () => onSelectRoute(item.id),
                       borderRadius: BorderRadius.circular(8),
-                      hoverColor: const Color(0xFF1E293B),
+                      hoverColor: hoverColor,
                       child: Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: isCollapsed ? 16 : 14,
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppConstants.primaryBlue : Colors.transparent,
+                          color: itemBgColor,
                           borderRadius: BorderRadius.circular(8),
+                          border: isSelected
+                              ? Border.all(
+                                  color: themeIsDark
+                                      ? const Color(0xFF0066FF).withOpacity(0.3)
+                                      : const Color(0xFFBFDBFE),
+                                  width: 1,
+                                )
+                              : null,
                         ),
                         child: Row(
                           mainAxisAlignment:
@@ -168,7 +212,7 @@ class Sidebar extends StatelessWidget {
                             Icon(
                               item.icon,
                               size: 20,
-                              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                              color: itemIconColor,
                             ),
                             if (!isCollapsed) ...[
                               const SizedBox(width: 12),
@@ -176,9 +220,9 @@ class Sidebar extends StatelessWidget {
                                 child: Text(
                                   item.title,
                                   style: TextStyle(
-                                    color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
+                                    color: itemTextColor,
                                     fontSize: 13,
-                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -199,9 +243,11 @@ class Sidebar extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF16203A),
+                color: themeIsDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF263353)),
+                border: Border.all(
+                  color: themeIsDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,12 +263,12 @@ class Sidebar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Vynex Relay Server',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white,
+                            color: themeIsDark ? Colors.white : const Color(0xFF1E293B),
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
@@ -231,10 +277,10 @@ class Sidebar extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'HBBS: 21116 • HBBR: 21117',
                     style: TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: themeIsDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       fontSize: 10,
                     ),
                   ),
@@ -242,7 +288,7 @@ class Sidebar extends StatelessWidget {
               ),
             ),
 
-          const Divider(color: Color(0xFF1E293B), height: 1),
+          Divider(color: dividerColor, height: 1),
 
           // User info footer
           Container(
@@ -277,8 +323,8 @@ class Sidebar extends StatelessWidget {
                               auth.currentUser.fullName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: themeIsDark ? Colors.white : const Color(0xFF0F172A),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -287,8 +333,8 @@ class Sidebar extends StatelessWidget {
                               auth.activeRole.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                              style: TextStyle(
+                                color: themeIsDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                 fontSize: 10,
                               ),
                             ),
@@ -296,7 +342,11 @@ class Sidebar extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8), size: 18),
+                        icon: Icon(
+                          Icons.logout_rounded,
+                          color: themeIsDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          size: 18,
+                        ),
                         onPressed: () => auth.logout(),
                         tooltip: 'Đăng xuất',
                       ),

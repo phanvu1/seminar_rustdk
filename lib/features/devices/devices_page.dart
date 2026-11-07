@@ -508,66 +508,79 @@ class _DevicesPageState extends State<DevicesPage> {
                                   if (!hasPerm) {
                                     showDialog(
                                       context: context,
-                                      builder: (c) => AlertDialog(
-                                        backgroundColor: const Color(0xFF1E293B),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                        title: const Row(
-                                          children: [
-                                            Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
-                                            SizedBox(width: 8),
-                                            Text('Chưa Có Quyền Truy Cập', style: TextStyle(color: Colors.white, fontSize: 16)),
-                                          ],
-                                        ),
-                                        content: Text(
-                                          'Bạn chưa được cấp quyền điều khiển máy "${dev.name}" (${dev.vynexId}).',
-                                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(c),
-                                            child: const Text('Đóng'),
-                                          ),
-                                          OutlinedButton.icon(
-                                            onPressed: () async {
-                                              await permService.requestPermission(
-                                                itUserId: auth.currentUser.userId,
-                                                itName: auth.currentUser.fullName,
-                                                deviceId: dev.deviceId,
-                                                deviceName: dev.name,
-                                                vynexId: dev.vynexId,
-                                                reason: 'Yêu cầu quyền điều khiển máy ${dev.name}',
-                                              );
-                                              if (!mounted) return;
-                                              Navigator.pop(c);
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
-                                                  backgroundColor: Color(0xFFF59E0B),
+                                      builder: (c) {
+                                        final isDarkDialog = Theme.of(c).brightness == Brightness.dark;
+                                        return AlertDialog(
+                                          backgroundColor: isDarkDialog ? const Color(0xFF1E293B) : Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                          title: Row(
+                                            children: [
+                                              const Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Chưa Có Quyền Truy Cập',
+                                                style: TextStyle(
+                                                  color: isDarkDialog ? Colors.white : const Color(0xFF0F172A),
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
-                                              );
-                                            },
-                                            icon: const Icon(Icons.send_rounded, size: 14),
-                                            label: const Text('Gửi yêu cầu tới Admin'),
+                                              ),
+                                            ],
                                           ),
-                                          ElevatedButton(
-                                            onPressed: () async {
-                                              await permService.grantPermission(
-                                                itUserId: auth.currentUser.userId,
-                                                itName: auth.currentUser.fullName,
-                                                deviceId: dev.deviceId,
-                                                deviceName: dev.name,
-                                                vynexId: dev.vynexId,
-                                                permissionType: 'control',
-                                                durationType: '24h',
-                                              );
-                                              if (!mounted) return;
-                                              Navigator.pop(c);
-                                            },
-                                            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
-                                            child: const Text('[Demo] Cấp Quyền 24h'),
+                                          content: Text(
+                                            'Bạn chưa được cấp quyền điều khiển máy "${dev.name}" (${dev.vynexId}).',
+                                            style: TextStyle(
+                                              color: isDarkDialog ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                              fontSize: 13,
+                                            ),
                                           ),
-                                        ],
-                                      ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(c),
+                                              child: const Text('Đóng'),
+                                            ),
+                                            OutlinedButton.icon(
+                                              onPressed: () async {
+                                                await permService.requestPermission(
+                                                  itUserId: auth.currentUser.userId,
+                                                  itName: auth.currentUser.fullName,
+                                                  deviceId: dev.deviceId,
+                                                  deviceName: dev.name,
+                                                  vynexId: dev.vynexId,
+                                                  reason: 'Yêu cầu quyền điều khiển máy ${dev.name}',
+                                                );
+                                                if (!mounted) return;
+                                                Navigator.pop(c);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
+                                                    backgroundColor: Color(0xFFF59E0B),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(Icons.send_rounded, size: 14),
+                                              label: const Text('Gửi yêu cầu tới Admin'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () async {
+                                                await permService.grantPermission(
+                                                  itUserId: auth.currentUser.userId,
+                                                  itName: auth.currentUser.fullName,
+                                                  deviceId: dev.deviceId,
+                                                  deviceName: dev.name,
+                                                  vynexId: dev.vynexId,
+                                                  permissionType: 'control',
+                                                  durationType: '24h',
+                                                );
+                                                if (!mounted) return;
+                                                Navigator.pop(c);
+                                              },
+                                              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+                                              child: const Text('[Demo] Cấp Quyền 24h'),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     );
                                     return;
                                   }

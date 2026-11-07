@@ -54,6 +54,15 @@ class _VynexAppState extends State<VynexApp> {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
+        builder: (context, child) {
+          return DefaultTextStyle(
+            style: const TextStyle(
+              fontFamily: AppTheme.defaultFont,
+              fontFamilyFallback: AppTheme.fontFallbacks,
+            ),
+            child: child ?? const SizedBox(),
+          );
+        },
         home: DashboardShell(
           isDark: _isDark,
           onToggleTheme: _toggleTheme,

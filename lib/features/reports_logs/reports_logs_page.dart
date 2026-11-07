@@ -116,75 +116,88 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
       // Hiển thị Dialog thông báo đường dẫn file đã xuất kèm các nút thao tác nhanh
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(isPdf ? Icons.picture_as_pdf_rounded : Icons.table_chart_rounded,
-                  color: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 28),
-              const SizedBox(width: 10),
-              Text(
-                'Xuất Báo Cáo $type Thành Công',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('File báo cáo đã được lưu trực tiếp vào ổ cứng:',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF334155)),
-                ),
-                child: SelectableText(
-                  filePath,
-                  style: const TextStyle(
-                    color: Color(0xFF38BDF8),
-                    fontFamily: 'monospace',
-                    fontSize: 12,
+        builder: (ctx) {
+          final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkDialog ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(isPdf ? Icons.picture_as_pdf_rounded : Icons.table_chart_rounded,
+                    color: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 28),
+                const SizedBox(width: 10),
+                Text(
+                  'Xuất Báo Cáo $type Thành Công',
+                  style: TextStyle(
+                    color: isDarkDialog ? Colors.white : const Color(0xFF0F172A),
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'File báo cáo đã được lưu trực tiếp vào ổ cứng:',
+                  style: TextStyle(
+                    color: isDarkDialog ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDarkDialog ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDarkDialog ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: SelectableText(
+                    filePath,
+                    style: TextStyle(
+                      color: isDarkDialog ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                      fontFamily: 'Consolas',
+                      fontFamilyFallback: const ['Courier New', 'monospace', 'Segoe UI'],
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Bạn có thể mở xem ngay hoặc mở thư mục lưu trữ trên Windows Explorer.',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
               ),
-              const SizedBox(height: 12),
-              const Text('Bạn có thể mở xem ngay hoặc mở thư mục lưu trữ trên Windows Explorer.',
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Process.run('explorer.exe', ['/select,', filePath]);
+                },
+                icon: const Icon(Icons.folder_open_rounded, size: 16),
+                label: const Text('Mở Thư Mục Chứa File'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Process.run('cmd.exe', ['/c', 'start', '', filePath]);
+                  Navigator.pop(ctx);
+                },
+                icon: const Icon(Icons.launch_rounded, size: 16),
+                label: const Text('Mở File Ngay'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Đóng'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () {
-                Process.run('explorer.exe', ['/select,', filePath]);
-              },
-              icon: const Icon(Icons.folder_open_rounded, size: 16),
-              label: const Text('Mở Thư Mục Chứa File'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Process.run('cmd.exe', ['/c', 'start', '', filePath]);
-                Navigator.pop(ctx);
-              },
-              icon: const Icon(Icons.launch_rounded, size: 16),
-              label: const Text('Mở File Ngay'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       );
 
       ScaffoldMessenger.of(context).showSnackBar(

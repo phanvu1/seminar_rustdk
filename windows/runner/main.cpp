@@ -27,7 +27,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 800);
-  if (!window.Create(L"Vynex Manager - Hệ thống Quản trị & Hỗ trợ Từ xa", origin, size)) {
+  if (!window.Create(L"Vynex Manager - H\u1EC7 th\u1ED1ng Qu\u1EA3n tr\u1ECB & H\u1ED7 tr\u1EE3 T\u1EEB xa", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
