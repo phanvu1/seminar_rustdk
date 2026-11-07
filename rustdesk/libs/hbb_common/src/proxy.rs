@@ -563,7 +563,7 @@ impl Proxy {
                 //
                 // If the protocol is TLS 1.1, the error is:
                 // 1. "IO Error: received fatal alert: ProtocolVersion"
-                // 2. "IO Error: An existing connection was forcibly closed by the remote host. (os error 10054)" on Windows sometimes.
+                // 2. "IO Error: Lỗi kết nối máy chủ. (os error 10054)" on Windows sometimes.
                 //
                 // If the cert verification fails, the error is:
                 // "IO Error: invalid peer certificate: UnknownIssuer"

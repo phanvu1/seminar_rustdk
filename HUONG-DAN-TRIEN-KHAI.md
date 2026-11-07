@@ -7,6 +7,32 @@
 
 ## Các bước triển khai
 
+### Chạy database bằng MySQL Workbench
+
+MySQL Workbench là công cụ quản lý; MySQL Server phải đang chạy trước.
+
+1. Mở MySQL Workbench và chạy toàn bộ file `api/RemoteDesktopDB_v3.sql`.
+2. Cài driver cho API:
+
+```powershell
+cd "D:\HKI 2026-2027\Seminar\seminar_rustdk\api"
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+3. Nếu dùng tài khoản mặc định `root` không có mật khẩu, chạy API như sau:
+
+```powershell
+$env:MYSQL_USER="root"
+$env:MYSQL_PASSWORD=""
+$env:MYSQL_HOST="127.0.0.1"
+$env:MYSQL_PORT="3306"
+$env:MYSQL_DATABASE="RemoteDesktopDB_v3"
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Nếu MySQL có mật khẩu, thay giá trị `MYSQL_PASSWORD`. Các endpoint và giao diện Flutter không thay đổi.
+
 ### Bước 1: Khởi động server
 ```powershell
 cd D:\rustdesk-server <vị trí thư mục lưu git của bạn>

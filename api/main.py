@@ -14,11 +14,11 @@ from database import get_db
 
 app = FastAPI(
     title="Vynex Enterprise Remote Access API",
-    description="Hệ thống Quản trị, Phân quyền RBAC & Điều khiển Từ xa Vynex",
+    description="Há»‡ thá»‘ng Quáº£n trá»‹, PhÃ¢n quyá»n RBAC & Äiá»u khiá»ƒn Tá»« xa Vynex",
     version="2.0.0"
 )
 
-# Cấu hình CORS để Dashboard kết nối thông suốt
+# Cáº¥u hÃ¬nh CORS Ä‘á»ƒ Dashboard káº¿t ná»‘i thÃ´ng suá»‘t
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,13 +27,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cấu hình JWT bí mật
+# Cáº¥u hÃ¬nh JWT bÃ­ máº­t
 JWT_SECRET = "vynex_enterprise_secret_key_2026_rbac_jwt_prod"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
 
 # =====================================================================
-# 1. HÀM TIỆN ÍCH JWT & BẢO MẬT (CHUẨN RFC 7519)
+# 1. HÃ€M TIá»†N ÃCH JWT & Báº¢O Máº¬T (CHUáº¨N RFC 7519)
 # =====================================================================
 def _base64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
@@ -45,13 +45,13 @@ def _base64url_decode(data: str) -> bytes:
 def create_jwt_token(payload: dict) -> str:
     header = {"alg": JWT_ALGORITHM, "typ": "JWT"}
     header_b64 = _base64url_encode(json.dumps(header).encode('utf-8'))
-    
-    # Gán thời hạn hết hạn
+
+    # GÃ¡n thá»i háº¡n háº¿t háº¡n
     exp = int(time.time()) + (JWT_EXPIRE_HOURS * 3600)
     payload_copy = payload.copy()
     payload_copy["exp"] = exp
     payload_b64 = _base64url_encode(json.dumps(payload_copy).encode('utf-8'))
-    
+
     signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
     signature = hmac.new(JWT_SECRET.encode('utf-8'), signing_input, hashlib.sha256).digest()
     sig_b64 = _base64url_encode(signature)
@@ -61,68 +61,68 @@ def verify_jwt_token(token: str) -> dict:
     try:
         parts = token.split('.')
         if len(parts) != 3:
-            raise ValueError("Token không đúng định dạng")
+            raise ValueError("Token khÃ´ng Ä‘Ãºng Ä‘á»‹nh dáº¡ng")
         header_b64, payload_b64, sig_b64 = parts
-        
+
         signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
         expected_sig = hmac.new(JWT_SECRET.encode('utf-8'), signing_input, hashlib.sha256).digest()
         actual_sig = _base64url_decode(sig_b64)
-        
+
         if not hmac.compare_digest(expected_sig, actual_sig):
-            raise ValueError("Chữ ký JWT không hợp lệ")
-            
+            raise ValueError("Chá»¯ kÃ½ JWT khÃ´ng há»£p lá»‡")
+
         payload = json.loads(_base64url_decode(payload_b64).decode('utf-8'))
         if "exp" in payload and time.time() > payload["exp"]:
-            raise ValueError("Token đã hết hạn")
-            
+            raise ValueError("Token Ä‘Ã£ háº¿t háº¡n")
+
         return payload
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token xác thực không hợp lệ: {str(e)}"
+            detail=f"Token xÃ¡c thá»±c khÃ´ng há»£p lá»‡: {str(e)}"
         )
 
 # =====================================================================
-# 2. DEPENDENCY XÁC THỰC NGƯỜI DÙNG & RBAC (SỬA AUTH-06, 08, 09, 10)
+# 2. DEPENDENCY XÃC THá»°C NGÆ¯á»œI DÃ™NG & RBAC (Sá»¬A AUTH-06, 08, 09, 10)
 # =====================================================================
 def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)) -> dict:
-    """Xác thực người dùng từ Header Authorization: Bearer <token>"""
+    """XÃ¡c thá»±c ngÆ°á»i dÃ¹ng tá»« Header Authorization: Bearer <token>"""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Yêu cầu Header Authorization: Bearer <JWT_Token>"
+            detail="YÃªu cáº§u Header Authorization: Bearer <JWT_Token>"
         )
     token = authorization.split(" ")[1]
-    
-    # Hỗ trợ demo bypass cho testing
+
+    # Há»— trá»£ demo bypass cho testing
     if token == "jwt-token-demo":
         return {
             "user_id": 1,
             "username": "admin",
-            "full_name": "Quản Trị Viên",
+            "full_name": "Quáº£n Trá»‹ ViÃªn",
             "role_id": 1,
             "role_name": "admin",
             "status": "active"
         }
-        
+
     payload = verify_jwt_token(token)
     user_id = payload.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=401, detail="Token không chứa user_id hợp lệ")
-        
+        raise HTTPException(status_code=401, detail="Token khÃ´ng chá»©a user_id há»£p lá»‡")
+
     try:
         query = text("""
             SELECT u.user_id, u.username, u.full_name, u.role_id, u.status, u.department_id, r.name as role_name
-            FROM dbo.Users u
-            LEFT JOIN dbo.Roles r ON u.role_id = r.role_id
+            FROM Users u
+            LEFT JOIN Roles r ON u.role_id = r.role_id
             WHERE u.user_id = :uid AND u.deleted_at IS NULL
         """)
         user = db.execute(query, {"uid": user_id}).fetchone()
         if not user:
-            raise HTTPException(status_code=401, detail="Người dùng không tồn tại hoặc đã bị xóa")
+            raise HTTPException(status_code=401, detail="NgÆ°á»i dÃ¹ng khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a")
         if user[4] != "active":
-            raise HTTPException(status_code=403, detail="Tài khoản đang bị khóa hoặc ngừng kích hoạt")
-            
+            raise HTTPException(status_code=403, detail="TÃ i khoáº£n Ä‘ang bá»‹ khÃ³a hoáº·c ngá»«ng kÃ­ch hoáº¡t")
+
         return {
             "user_id": user[0],
             "username": user[1],
@@ -135,7 +135,7 @@ def get_current_user(authorization: Optional[str] = Header(None), db: Session = 
     except HTTPException:
         raise
     except Exception as e:
-        # Fallback an toàn nếu DB offline
+        # Fallback an toÃ n náº¿u DB offline
         return {
             "user_id": user_id,
             "username": payload.get("username", "user"),
@@ -149,7 +149,7 @@ def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     if current_user["role_id"] != 1 and current_user["role_name"] != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Từ chối truy cập: Chỉ Quản trị viên (Admin) mới có quyền thực hiện thao tác này (RBAC)"
+            detail="Tá»« chá»‘i truy cáº­p: Chá»‰ Quáº£n trá»‹ viÃªn (Admin) má»›i cÃ³ quyá»n thá»±c hiá»‡n thao tÃ¡c nÃ y (RBAC)"
         )
     return current_user
 
@@ -157,12 +157,12 @@ def require_it_or_admin(current_user: dict = Depends(get_current_user)) -> dict:
     if current_user["role_id"] not in [1, 2] and current_user["role_name"] not in ["admin", "it"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Từ chối truy cập: Thao tác yêu cầu quyền Kỹ thuật viên IT hoặc Admin (RBAC)"
+            detail="Tá»« chá»‘i truy cáº­p: Thao tÃ¡c yÃªu cáº§u quyá»n Ká»¹ thuáº­t viÃªn IT hoáº·c Admin (RBAC)"
         )
     return current_user
 
 # =====================================================================
-# 3. PYDANTIC SCHEMAS (MÔ HÌNH DỮ LIỆU)
+# 3. PYDANTIC SCHEMAS (MÃ” HÃŒNH Dá»® LIá»†U)
 # =====================================================================
 class LoginRequest(BaseModel):
     username: str
@@ -209,8 +209,8 @@ class PermissionGrant(BaseModel):
     user_id: int        # IT User ID
     device_id: int      # Target Device ID
     permission_type: Optional[str] = "control"  # view, control, file_transfer, full
-    duration_hours: Optional[int] = 24          # Mặc định cấp quyền 24h
-    notes: Optional[str] = "Cấp quyền hỗ trợ kỹ thuật"
+    duration_hours: Optional[int] = 24          # Máº·c Ä‘á»‹nh cáº¥p quyá»n 24h
+    notes: Optional[str] = "Cáº¥p quyá»n há»— trá»£ ká»¹ thuáº­t"
 
 class SessionCreate(BaseModel):
     request_id: Optional[int] = 0
@@ -222,7 +222,7 @@ class SessionCreate(BaseModel):
 
 class SessionEnd(BaseModel):
     quality_score: Optional[int] = 5
-    notes: Optional[str] = "Phiên hỗ trợ hoàn tất"
+    notes: Optional[str] = "PhiÃªn há»— trá»£ hoÃ n táº¥t"
 
 class NotificationCreate(BaseModel):
     user_id: int
@@ -232,16 +232,16 @@ class NotificationCreate(BaseModel):
     reference_id: Optional[int] = None
 
 # =====================================================================
-# 4. API ENDPOINTS (ROUTES ĐẦY ĐỦ 100%)
+# 4. API ENDPOINTS (ROUTES Äáº¦Y Äá»¦ 100%)
 # =====================================================================
 
 @app.get("/")
 def root(db: Session = Depends(get_db)):
     try:
-        result = db.execute(text("SELECT @@VERSION")).fetchone()
+        result = db.execute(text("SELECT VERSION()")).fetchone()
         sql_ver = result[0] if result else "OK"
     except Exception as e:
-        sql_ver = f"Chế độ ngoại tuyến: {e}"
+        sql_ver = f"Cháº¿ Ä‘á»™ ngoáº¡i tuyáº¿n: {e}"
     return {
         "status": "online",
         "service": "Vynex Enterprise Remote Access API v2.0",
@@ -249,35 +249,35 @@ def root(db: Session = Depends(get_db)):
         "features": ["JWT_Auth", "RBAC", "24h_Permission_Guard", "WireGuard_VPN_Isolated", "Audit_Logs"]
     }
 
-# --- NHÓM 1: AUTHENTICATION & PROFILE (AUTH-01 -> AUTH-10) ---
+# --- NHÃ“M 1: AUTHENTICATION & PROFILE (AUTH-01 -> AUTH-10) ---
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     """
-    Sửa lỗi AUTH-05 (P0): Bắt buộc kiểm tra status = 'active'.
-    Tài khoản 'inactive' hoặc 'locked' bị từ chối với HTTP 403.
+    Sá»­a lá»—i AUTH-05 (P0): Báº¯t buá»™c kiá»ƒm tra status = 'active'.
+    TÃ i khoáº£n 'inactive' hoáº·c 'locked' bá»‹ tá»« chá»‘i vá»›i HTTP 403.
     """
     query = text("""
-        SELECT user_id, username, full_name, role_id, status, department_id 
-        FROM dbo.Users 
+        SELECT user_id, username, full_name, role_id, status, department_id
+        FROM Users
         WHERE username = :u AND password_hash = :p AND deleted_at IS NULL
     """)
     user = db.execute(query, {"u": req.username, "p": req.password}).fetchone()
     if not user:
-        raise HTTPException(status_code=401, detail="Sai tài khoản hoặc mật khẩu")
-        
+        raise HTTPException(status_code=401, detail="Sai tÃ i khoáº£n hoáº·c máº­t kháº©u")
+
     user_id, username, full_name, role_id, user_status, dept_id = user
-    
-    # SỬA LỖI AUTH-05 (P0): Chặn tài khoản bị khóa / vô hiệu hóa
+
+    # Sá»¬A Lá»–I AUTH-05 (P0): Cháº·n tÃ i khoáº£n bá»‹ khÃ³a / vÃ´ hiá»‡u hÃ³a
     if user_status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Tài khoản '{username}' đang ở trạng thái '{user_status}'. Vui lòng liên hệ Admin để mở khóa."
+            detail=f"TÃ i khoáº£n '{username}' Ä‘ang á»Ÿ tráº¡ng thÃ¡i '{user_status}'. Vui lÃ²ng liÃªn há»‡ Admin Ä‘á»ƒ má»Ÿ khÃ³a."
         )
-        
+
     role_name = "admin" if role_id == 1 else ("it" if role_id == 2 else "user")
-    
-    # Sinh JWT Token thực thụ (RFC 7519)
+
+    # Sinh JWT Token thá»±c thá»¥ (RFC 7519)
     token = create_jwt_token({
         "user_id": user_id,
         "username": username,
@@ -285,9 +285,9 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         "role_id": role_id,
         "role_name": role_name
     })
-    
+
     return {
-        "message": "Đăng nhập thành công",
+        "message": "ÄÄƒng nháº­p thÃ nh cÃ´ng",
         "token": token,
         "user": {
             "user_id": user_id,
@@ -302,40 +302,40 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/logout")
 def logout():
-    return {"message": "Đăng xuất thành công, phiên làm việc đã được đóng"}
+    return {"message": "ÄÄƒng xuáº¥t thÃ nh cÃ´ng, phiÃªn lÃ m viá»‡c Ä‘Ã£ Ä‘Æ°á»£c Ä‘Ã³ng"}
 
 @app.get("/api/auth/me")
 def get_me(current_user: dict = Depends(get_current_user)):
-    """Sửa lỗi AUTH-09: Giải mã token JWT thực sự và trả về profile người dùng"""
+    """Sá»­a lá»—i AUTH-09: Giáº£i mÃ£ token JWT thá»±c sá»± vÃ  tráº£ vá» profile ngÆ°á»i dÃ¹ng"""
     return {"user": current_user}
 
-# --- NHÓM 2: QUẢN LÝ NGƯỜI DÙNG & TRỤ SỞ (USER-01 -> USER-08) ---
+# --- NHÃ“M 2: QUáº¢N LÃ NGÆ¯á»œI DÃ™NG & TRá»¤ Sá»ž (USER-01 -> USER-08) ---
 
 @app.get("/api/users")
 def get_users(db: Session = Depends(get_db)):
     try:
         query = text("""
-            SELECT u.user_id, u.username, u.full_name, u.email, u.phone, u.role_id, u.status, 
+            SELECT u.user_id, u.username, u.full_name, u.email, u.phone, u.role_id, u.status,
                    u.department_id, d.name as department_name
-            FROM dbo.Users u
-            LEFT JOIN dbo.Departments d ON u.department_id = d.department_id
+            FROM Users u
+            LEFT JOIN Departments d ON u.department_id = d.department_id
             WHERE u.deleted_at IS NULL
         """)
         users = db.execute(query).fetchall()
         return {"data": [{
             "user_id": u[0], "username": u[1], "full_name": u[2], "email": u[3],
             "phone": u[4], "role_id": u[5], "status": u[6], "department_id": u[7],
-            "department_name": u[8] or "Chưa phân bổ"
+            "department_name": u[8] or "ChÆ°a phÃ¢n bá»•"
         } for u in users]}
     except Exception as e:
         return {"data": [], "error": str(e)}
 
 @app.post("/api/users")
 def create_user(req: UserCreate, current_user: dict = Depends(require_admin), db: Session = Depends(get_db)):
-    """Sửa lỗi AUTH-06: Chỉ Admin mới được tạo người dùng mới"""
+    """Sá»­a lá»—i AUTH-06: Chá»‰ Admin má»›i Ä‘Æ°á»£c táº¡o ngÆ°á»i dÃ¹ng má»›i"""
     try:
         query = text("""
-            INSERT INTO dbo.Users (username, password_hash, full_name, role_id, department_id, email, phone, status)
+            INSERT INTO Users (username, password_hash, full_name, role_id, department_id, email, phone, status)
             VALUES (:u, :p, :f, :r, :d, :e, :ph, 'active')
         """)
         db.execute(query, {
@@ -343,34 +343,34 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_admin), db
             "r": req.role_id, "d": req.department_id, "e": req.email, "ph": req.phone
         })
         db.commit()
-        return {"message": f"Tạo người dùng '{req.username}' thành công"}
+        return {"message": f"Táº¡o ngÆ°á»i dÃ¹ng '{req.username}' thÃ nh cÃ´ng"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"Không thể tạo người dùng: {e}")
+        raise HTTPException(status_code=400, detail=f"KhÃ´ng thá»ƒ táº¡o ngÆ°á»i dÃ¹ng: {e}")
 
 @app.put("/api/users/{id}")
 def update_user(id: int, req: UserUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    Sửa lỗi AUTH-08 (IDOR) & USER-08 (P1):
-    - Người dùng thường chỉ được sửa họ tên của chính mình.
-    - Admin có quyền cập nhật toàn bộ: role_id, department_id, status.
+    Sá»­a lá»—i AUTH-08 (IDOR) & USER-08 (P1):
+    - NgÆ°á»i dÃ¹ng thÆ°á»ng chá»‰ Ä‘Æ°á»£c sá»­a há» tÃªn cá»§a chÃ­nh mÃ¬nh.
+    - Admin cÃ³ quyá»n cáº­p nháº­t toÃ n bá»™: role_id, department_id, status.
     """
     is_admin = current_user["role_id"] == 1
     if not is_admin and current_user["user_id"] != id:
-        raise HTTPException(status_code=403, detail="Từ chối truy cập: Bạn không thể sửa thông tin người khác (Chống IDOR)")
+        raise HTTPException(status_code=403, detail="Tá»« chá»‘i truy cáº­p: Báº¡n khÃ´ng thá»ƒ sá»­a thÃ´ng tin ngÆ°á»i khÃ¡c (Chá»‘ng IDOR)")
 
     try:
         updates = []
         params = {"id": id}
-        
+
         if req.full_name is not None:
             updates.append("full_name = :f")
             params["f"] = req.full_name
         if req.email is not None:
             updates.append("email = :e")
             params["e"] = req.email
-            
-        # Các trường quản trị chỉ Admin mới được thay đổi
+
+        # CÃ¡c trÆ°á»ng quáº£n trá»‹ chá»‰ Admin má»›i Ä‘Æ°á»£c thay Ä‘á»•i
         if is_admin:
             if req.role_id is not None:
                 updates.append("role_id = :r")
@@ -383,64 +383,64 @@ def update_user(id: int, req: UserUpdate, current_user: dict = Depends(get_curre
                 params["s"] = req.status
 
         if not updates:
-            return {"message": "Không có thông tin nào cần thay đổi"}
+            return {"message": "KhÃ´ng cÃ³ thÃ´ng tin nÃ o cáº§n thay Ä‘á»•i"}
 
-        query_str = f"UPDATE dbo.Users SET {', '.join(updates)} WHERE user_id = :id AND deleted_at IS NULL"
+        query_str = f"UPDATE Users SET {', '.join(updates)} WHERE user_id = :id AND deleted_at IS NULL"
         db.execute(text(query_str), params)
         db.commit()
-        return {"message": f"Cập nhật người dùng ID {id} thành công"}
+        return {"message": f"Cáº­p nháº­t ngÆ°á»i dÃ¹ng ID {id} thÃ nh cÃ´ng"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.delete("/api/users/{id}")
 def delete_user(id: int, current_user: dict = Depends(require_admin), db: Session = Depends(get_db)):
-    """Sửa lỗi AUTH-06: Chỉ Admin mới có quyền xóa người dùng"""
+    """Sá»­a lá»—i AUTH-06: Chá»‰ Admin má»›i cÃ³ quyá»n xÃ³a ngÆ°á»i dÃ¹ng"""
     try:
-        query = text("UPDATE dbo.Users SET deleted_at = SYSDATETIME(), status = 'inactive' WHERE user_id = :id")
+        query = text("UPDATE Users SET deleted_at = CURRENT_TIMESTAMP, status = 'inactive' WHERE user_id = :id")
         db.execute(query, {"id": id})
         db.commit()
-        return {"message": f"Đã khóa và xóa người dùng ID {id}"}
+        return {"message": f"ÄÃ£ khÃ³a vÃ  xÃ³a ngÆ°á»i dÃ¹ng ID {id}"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-# --- NHÓM 3: TRỤ SỞ & PHÒNG BAN (SỬA USER-03) ---
+# --- NHÃ“M 3: TRá»¤ Sá»ž & PHÃ’NG BAN (Sá»¬A USER-03) ---
 
 @app.get("/api/branches")
 def get_branches():
-    """Hỗ trợ phân bổ 20 nhân sự vào 3 Trụ sở chính"""
+    """Há»— trá»£ phÃ¢n bá»• 20 nhÃ¢n sá»± vÃ o 3 Trá»¥ sá»Ÿ chÃ­nh"""
     return {
         "data": [
-            {"branch_id": 1, "code": "BRANCH_A", "name": "Trụ sở A - Hà Nội (Trụ sở chính)", "ip_subnet": "10.13.13.0/24", "head": "admin_a"},
-            {"branch_id": 2, "code": "BRANCH_B", "name": "Trụ sở B - Đà Nẵng", "ip_subnet": "10.13.14.0/24", "head": "it_phuong_b"},
-            {"branch_id": 3, "code": "BRANCH_C", "name": "Trụ sở C - TP. Hồ Chí Minh", "ip_subnet": "10.13.15.0/24", "head": "it_thang_c"}
+            {"branch_id": 1, "code": "BRANCH_A", "name": "Trá»¥ sá»Ÿ A - HÃ  Ná»™i (Trá»¥ sá»Ÿ chÃ­nh)", "ip_subnet": "10.13.13.0/24", "head": "admin_a"},
+            {"branch_id": 2, "code": "BRANCH_B", "name": "Trá»¥ sá»Ÿ B - ÄÃ  Náºµng", "ip_subnet": "10.13.14.0/24", "head": "it_phuong_b"},
+            {"branch_id": 3, "code": "BRANCH_C", "name": "Trá»¥ sá»Ÿ C - TP. Há»“ ChÃ­ Minh", "ip_subnet": "10.13.15.0/24", "head": "it_thang_c"}
         ]
     }
 
 @app.get("/api/departments")
 def get_departments(db: Session = Depends(get_db)):
     try:
-        query = text("SELECT department_id, name, description FROM dbo.Departments WHERE deleted_at IS NULL")
+        query = text("SELECT department_id, name, description FROM Departments WHERE deleted_at IS NULL")
         rows = db.execute(query).fetchall()
         return {"data": [{"department_id": r[0], "name": r[1], "description": r[2]} for r in rows]}
     except Exception:
         return {"data": [
-            {"department_id": 1, "name": "Phòng Kỹ thuật & CNTT", "description": "Quản trị mạng & Hỗ trợ kỹ thuật"},
-            {"department_id": 2, "name": "Phòng Kế toán - Tài chính", "description": "Tài chính & Kế toán"},
-            {"department_id": 3, "name": "Phòng Kinh doanh & Tiếp thị", "description": "Bán hàng & Marketing"}
+            {"department_id": 1, "name": "PhÃ²ng Ká»¹ thuáº­t & CNTT", "description": "Quáº£n trá»‹ máº¡ng & Há»— trá»£ ká»¹ thuáº­t"},
+            {"department_id": 2, "name": "PhÃ²ng Káº¿ toÃ¡n - TÃ i chÃ­nh", "description": "TÃ i chÃ­nh & Káº¿ toÃ¡n"},
+            {"department_id": 3, "name": "PhÃ²ng Kinh doanh & Tiáº¿p thá»‹", "description": "BÃ¡n hÃ ng & Marketing"}
         ]}
 
-# --- NHÓM 4: QUẢN LÝ THIẾT BỊ (DEVICE) ---
+# --- NHÃ“M 4: QUáº¢N LÃ THIáº¾T Bá»Š (DEVICE) ---
 
 @app.get("/api/devices")
 def get_devices(db: Session = Depends(get_db)):
     try:
         query = text("""
-            SELECT d.device_id, d.device_name, d.rustdesk_id, d.ip_address, d.status, 
+            SELECT d.device_id, d.device_name, d.rustdesk_id, d.ip_address, d.status,
                    d.user_id, u.full_name as owner_name, d.last_online
-            FROM dbo.Devices d
-            LEFT JOIN dbo.Users u ON d.user_id = u.user_id
+            FROM Devices d
+            LEFT JOIN Users u ON d.user_id = u.user_id
             WHERE d.deleted_at IS NULL
         """)
         rows = db.execute(query).fetchall()
@@ -455,33 +455,33 @@ def get_devices(db: Session = Depends(get_db)):
 def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
     try:
         query = text("""
-            INSERT INTO dbo.Devices (user_id, device_name, rustdesk_id, ip_address, department_id, device_type, status, last_online)
-            VALUES (:uid, :dname, :rid, :ip, :dept, :dtype, 'online', SYSDATETIME())
+            INSERT INTO Devices (user_id, device_name, rustdesk_id, ip_address, department_id, device_type, status, last_online)
+            VALUES (:uid, :dname, :rid, :ip, :dept, :dtype, 'online', CURRENT_TIMESTAMP)
         """)
         db.execute(query, {
             "uid": req.user_id, "dname": req.device_name, "rid": req.rustdesk_id,
             "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
         })
         db.commit()
-        return {"message": f"Thêm thiết bị '{req.device_name}' (ID: {req.rustdesk_id}) thành công"}
+        return {"message": f"ThÃªm thiáº¿t bá»‹ '{req.device_name}' (ID: {req.rustdesk_id}) thÃ nh cÃ´ng"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-# --- NHÓM 5: YÊU CẦU HỖ TRỢ (TICKETS - SỬA LỖI REQUEST-01 -> 11) ---
+# --- NHÃ“M 5: YÃŠU Cáº¦U Há»– TRá»¢ (TICKETS - Sá»¬A Lá»–I REQUEST-01 -> 11) ---
 
 @app.get("/api/support-requests")
 def get_support_requests(db: Session = Depends(get_db)):
-    """Lấy danh sách tất cả yêu cầu hỗ trợ kỹ thuật"""
+    """Láº¥y danh sÃ¡ch táº¥t cáº£ yÃªu cáº§u há»— trá»£ ká»¹ thuáº­t"""
     try:
         query = text("""
             SELECT sr.request_id, sr.employee_id, u.full_name as emp_name, sr.device_id, d.device_name, d.rustdesk_id,
                    sr.title, sr.description, sr.priority, sr.status, sr.assigned_it_id, it.full_name as it_name,
                    sr.rating, sr.feedback, sr.created_at, sr.accepted_at, sr.completed_at
-            FROM dbo.SupportRequests sr
-            LEFT JOIN dbo.Users u ON sr.employee_id = u.user_id
-            LEFT JOIN dbo.Devices d ON sr.device_id = d.device_id
-            LEFT JOIN dbo.Users it ON sr.assigned_it_id = it.user_id
+            FROM SupportRequests sr
+            LEFT JOIN Users u ON sr.employee_id = u.user_id
+            LEFT JOIN Devices d ON sr.device_id = d.device_id
+            LEFT JOIN Users it ON sr.assigned_it_id = it.user_id
             ORDER BY sr.request_id DESC
         """)
         rows = db.execute(query).fetchall()
@@ -502,7 +502,7 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
     """Nhân viên gửi yêu cầu hỗ trợ kỹ thuật mới (Lỗi 2.5)"""
     try:
         query = text("""
-            INSERT INTO dbo.SupportRequests (employee_id, device_id, title, description, priority, status)
+            INSERT INTO SupportRequests (employee_id, device_id, title, description, priority, status)
             VALUES (:emp, :dev, :t, :d, :p, 'pending')
         """)
         db.execute(query, {
@@ -535,11 +535,11 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
 
 @app.put("/api/support-requests/{id}/accept")
 def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depends(get_db)):
-    """IT tiếp nhận yêu cầu hỗ trợ"""
+    """IT tiáº¿p nháº­n yÃªu cáº§u há»— trá»£"""
     try:
         query = text("""
-            UPDATE dbo.SupportRequests 
-            SET status = 'accepted', assigned_it_id = :it, accepted_at = SYSDATETIME()
+            UPDATE SupportRequests
+            SET status = 'accepted', assigned_it_id = :it, accepted_at = CURRENT_TIMESTAMP
             WHERE request_id = :id AND status = 'pending'
         """)
         res = db.execute(query, {"id": id, "it": it_id})
@@ -569,36 +569,36 @@ def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depe
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/support-requests/{id}/reject")
-def reject_support_request(id: int, reason: Optional[str] = "Không thể xử lý", db: Session = Depends(get_db)):
-    """Từ chối yêu cầu hỗ trợ"""
+def reject_support_request(id: int, reason: Optional[str] = "KhÃ´ng thá»ƒ xá»­ lÃ½", db: Session = Depends(get_db)):
+    """Tá»« chá»‘i yÃªu cáº§u há»— trá»£"""
     try:
-        query = text("UPDATE dbo.SupportRequests SET status = 'rejected', feedback = :r WHERE request_id = :id")
+        query = text("UPDATE SupportRequests SET status = 'rejected', feedback = :r WHERE request_id = :id")
         db.execute(query, {"id": id, "r": reason})
         db.commit()
-        return {"message": f"Đã từ chối ticket #{id}"}
+        return {"message": f"ÄÃ£ tá»« chá»‘i ticket #{id}"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/support-requests/{id}/cancel")
 def cancel_support_request(id: int, db: Session = Depends(get_db)):
-    """Nhân viên tự hủy ticket"""
+    """NhÃ¢n viÃªn tá»± há»§y ticket"""
     try:
-        query = text("UPDATE dbo.SupportRequests SET status = 'cancelled' WHERE request_id = :id")
+        query = text("UPDATE SupportRequests SET status = 'cancelled' WHERE request_id = :id")
         db.execute(query, {"id": id})
         db.commit()
-        return {"message": f"Đã hủy ticket #{id}"}
+        return {"message": f"ÄÃ£ há»§y ticket #{id}"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/support-requests/{id}/complete")
 def complete_support_request(id: int, db: Session = Depends(get_db)):
-    """IT hoàn tất xử lý ticket"""
+    """IT hoÃ n táº¥t xá»­ lÃ½ ticket"""
     try:
         query = text("""
-            UPDATE dbo.SupportRequests 
-            SET status = 'completed', completed_at = SYSDATETIME()
+            UPDATE SupportRequests
+            SET status = 'completed', completed_at = CURRENT_TIMESTAMP
             WHERE request_id = :id
         """)
         db.execute(query, {"id": id})
@@ -629,30 +629,30 @@ def complete_support_request(id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/support-requests/{id}/rate")
 def rate_support_request(id: int, req: SupportRequestRate, db: Session = Depends(get_db)):
-    """Nhân viên chấm điểm chất lượng hỗ trợ 1 - 5 sao"""
+    """NhÃ¢n viÃªn cháº¥m Ä‘iá»ƒm cháº¥t lÆ°á»£ng há»— trá»£ 1 - 5 sao"""
     if req.rating < 1 or req.rating > 5:
-        raise HTTPException(status_code=400, detail="Đánh giá sao phải từ 1 đến 5")
+        raise HTTPException(status_code=400, detail="ÄÃ¡nh giÃ¡ sao pháº£i tá»« 1 Ä‘áº¿n 5")
     try:
-        query = text("UPDATE dbo.SupportRequests SET rating = :r, feedback = :f WHERE request_id = :id")
+        query = text("UPDATE SupportRequests SET rating = :r, feedback = :f WHERE request_id = :id")
         db.execute(query, {"id": id, "r": req.rating, "f": req.feedback})
         db.commit()
-        return {"message": "Cảm ơn bạn đã đánh giá chất lượng dịch vụ hỗ trợ"}
+        return {"message": "Cáº£m Æ¡n báº¡n Ä‘Ã£ Ä‘Ã¡nh giÃ¡ cháº¥t lÆ°á»£ng dá»‹ch vá»¥ há»— trá»£"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-# --- NHÓM 6: CẤP QUYỀN TRUY CẬP 24H & CHỐT CHẶN (PERMISSION & ANTI-BYPASS) ---
+# --- NHÃ“M 6: Cáº¤P QUYá»€N TRUY Cáº¬P 24H & CHá»T CHáº¶N (PERMISSION & ANTI-BYPASS) ---
 
 @app.get("/api/permissions")
 def get_permissions(db: Session = Depends(get_db)):
-    """Lấy danh sách tất cả quyền đã cấp"""
+    """Láº¥y danh sÃ¡ch táº¥t cáº£ quyá»n Ä‘Ã£ cáº¥p"""
     try:
         query = text("""
             SELECT p.permission_id, p.user_id, u.full_name as it_name, p.device_id, d.device_name, d.rustdesk_id,
                    p.permission_type, p.granted_at, p.expires_at, p.revoked_at, p.status, p.notes
-            FROM dbo.Permissions p
-            LEFT JOIN dbo.Users u ON p.user_id = u.user_id
-            LEFT JOIN dbo.Devices d ON p.device_id = d.device_id
+            FROM Permissions p
+            LEFT JOIN Users u ON p.user_id = u.user_id
+            LEFT JOIN Devices d ON p.device_id = d.device_id
             WHERE p.deleted_at IS NULL
             ORDER BY p.permission_id DESC
         """)
@@ -675,11 +675,11 @@ def get_permissions(db: Session = Depends(get_db)):
 
 @app.post("/api/permissions")
 def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
-    """Admin cấp quyền truy cập thiết bị có thời hạn (Mặc định 24h)"""
+    """Admin cáº¥p quyá»n truy cáº­p thiáº¿t bá»‹ cÃ³ thá»i háº¡n (Máº·c Ä‘á»‹nh 24h)"""
     try:
         query = text("""
-            INSERT INTO dbo.Permissions (user_id, device_id, permission_type, granted_by, granted_at, expires_at, status, notes)
-            VALUES (:uid, :did, :ptype, 1, SYSDATETIME(), DATEADD(hour, :hours, SYSDATETIME()), 1, :notes)
+            INSERT INTO Permissions (user_id, device_id, permission_type, granted_by, granted_at, expires_at, status, notes)
+            VALUES (:uid, :did, :ptype, 1, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL :hours HOUR), 1, :notes)
         """)
         db.execute(query, {
             "uid": req.user_id, "did": req.device_id, "ptype": req.permission_type,
@@ -711,13 +711,13 @@ def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
 
 @app.put("/api/permissions/{id}/revoke")
 def revoke_permission(id: int, db: Session = Depends(get_db)):
-    """Admin chủ động thu hồi quyền trước hạn"""
+    """Admin chá»§ Ä‘á»™ng thu há»“i quyá»n trÆ°á»›c háº¡n"""
     try:
         perm_row = db.execute(text("SELECT user_id, device_id FROM dbo.Permissions WHERE permission_id = :id"), {"id": id}).fetchone()
         
         query = text("""
-            UPDATE dbo.Permissions 
-            SET revoked_at = SYSDATETIME(), status = 0 
+            UPDATE Permissions
+            SET revoked_at = CURRENT_TIMESTAMP, status = 0
             WHERE permission_id = :id
         """)
         db.execute(query, {"id": id})
@@ -750,35 +750,36 @@ def revoke_permission(id: int, db: Session = Depends(get_db)):
 @app.get("/api/permissions/verify-access")
 def check_permission(user_id: int = 0, rustdesk_id: str = "", device_id: int = 0, token: str = "", db: Session = Depends(get_db)):
     """
-    CHỐT CHẶN BẢO MẬT CỐT LÕI (ANTI-BYPASS GUARD - SỬA LỖI SESSION-01 & SESSION-02):
-    - Kiểm tra thời gian thực trên CSDL: SYSDATETIME() phải nằm trong [granted_at, expires_at]
-    - Bắt buộc: status = 1, revoked_at IS NULL, deleted_at IS NULL.
-    - Nếu người dùng tự mở vynex_client.exe nhập ID/Pass khi CHƯA có quyền hợp lệ trên DB -> CHẶN ĐỨNG NGAY!
+    CHá»T CHáº¶N Báº¢O Máº¬T Cá»T LÃ•I (ANTI-BYPASS GUARD - Sá»¬A Lá»–I SESSION-01 & SESSION-02):
+    - Kiá»ƒm tra thá»i gian thá»±c trÃªn CSDL: CURRENT_TIMESTAMP pháº£i náº±m trong [granted_at, expires_at]
+    - Báº¯t buá»™c: status = 1, revoked_at IS NULL, deleted_at IS NULL.
+    - Náº¿u ngÆ°á»i dÃ¹ng tá»± má»Ÿ vynex_client.exe nháº­p ID/Pass khi CHÆ¯A cÃ³ quyá»n há»£p lá»‡ trÃªn DB -> CHáº¶N Äá»¨NG NGAY!
     """
-    # 1. Xác thực qua Session Token (do Vynex Manager sinh)
+    # 1. XÃ¡c thá»±c qua Session Token (do Vynex Manager sinh)
     if token and token.startswith("vynex_token_"):
         parts = token.split("_")
         if len(parts) >= 4:
             return {
                 "allowed": True,
-                "reason": "Xác thực thành công qua Vynex Session Token được cấp phép",
+                "reason": "XÃ¡c thá»±c thÃ nh cÃ´ng qua Vynex Session Token Ä‘Æ°á»£c cáº¥p phÃ©p",
                 "token": token,
                 "mode": "authorized_token"
             }
 
-    # 2. Xác thực trực tiếp trên Bảng Permissions trong CSDL
+    # 2. XÃ¡c thá»±c trá»±c tiáº¿p trÃªn Báº£ng Permissions trong CSDL
     try:
         query = text("""
-            SELECT TOP 1 p.permission_id, p.permission_type, p.expires_at, p.status, d.rustdesk_id, d.device_name
-            FROM dbo.Permissions p
-            JOIN dbo.Devices d ON p.device_id = d.device_id
+            SELECT p.permission_id, p.permission_type, p.expires_at, p.status, d.rustdesk_id, d.device_name
+            FROM Permissions p
+            JOIN Devices d ON p.device_id = d.device_id
             WHERE (d.rustdesk_id = :rid OR p.device_id = :did)
               AND (:uid = 0 OR p.user_id = :uid)
               AND p.status = 1
-              AND (p.expires_at IS NULL OR p.expires_at > SYSDATETIME())
+              AND (p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)
               AND p.revoked_at IS NULL
               AND p.deleted_at IS NULL
             ORDER BY p.permission_id DESC
+            LIMIT 1
         """)
         row = db.execute(query, {"rid": rustdesk_id, "did": device_id, "uid": user_id}).fetchone()
         if row:
@@ -788,18 +789,18 @@ def check_permission(user_id: int = 0, rustdesk_id: str = "", device_id: int = 0
                 "permission_type": row[1],
                 "expires_at": str(row[2]),
                 "device_name": row[5],
-                "reason": "Quyền truy cập 24h hợp lệ trong CSDL"
+                "reason": "Quyá»n truy cáº­p 24h há»£p lá»‡ trong CSDL"
             }
     except Exception:
         pass
 
-    # TỪ CHỐI KẾT NỐI (Chặn đứng theo chính sách Zero-Trust)
+    # Tá»ª CHá»I Káº¾T Ná»I (Cháº·n Ä‘á»©ng theo chÃ­nh sÃ¡ch Zero-Trust)
     return {
         "allowed": False,
-        "reason": "Từ chối truy cập: Bạn chưa được Quản trị viên cấp quyền điều khiển thiết bị này trên Vynex Manager (hoặc quyền đã hết hạn)."
+        "reason": "Tá»« chá»‘i truy cáº­p: Báº¡n chÆ°a Ä‘Æ°á»£c Quáº£n trá»‹ viÃªn cáº¥p quyá»n Ä‘iá»u khiá»ƒn thiáº¿t bá»‹ nÃ y trÃªn Vynex Manager (hoáº·c quyá»n Ä‘Ã£ háº¿t háº¡n)."
     }
 
-# --- NHÓM 7: GHI NHẬT KÝ PHIÊN (REMOTE SESSIONS) ---
+# --- NHÃ“M 7: GHI NHáº¬T KÃ PHIÃŠN (REMOTE SESSIONS) ---
 
 @app.get("/api/sessions")
 def get_sessions(db: Session = Depends(get_db)):
@@ -810,10 +811,10 @@ def get_sessions(db: Session = Depends(get_db)):
                    rs.source_device_id, rs.target_device_id, d.device_name, d.rustdesk_id,
                    rs.connection_type, rs.start_time, rs.end_time, rs.duration_seconds,
                    rs.quality_score, rs.status, rs.notes
-            FROM dbo.RemoteSessions rs
-            LEFT JOIN dbo.Users it ON rs.it_user_id = it.user_id
-            LEFT JOIN dbo.Users u ON rs.target_user_id = u.user_id
-            LEFT JOIN dbo.Devices d ON rs.target_device_id = d.device_id
+            FROM RemoteSessions rs
+            LEFT JOIN Users it ON rs.it_user_id = it.user_id
+            LEFT JOIN Users u ON rs.target_user_id = u.user_id
+            LEFT JOIN Devices d ON rs.target_device_id = d.device_id
             ORDER BY rs.session_id DESC
         """)
         rows = db.execute(query).fetchall()
@@ -830,33 +831,33 @@ def get_sessions(db: Session = Depends(get_db)):
 
 @app.post("/api/sessions")
 def start_session(req: SessionCreate, db: Session = Depends(get_db)):
-    """Ghi nhận bắt đầu phiên kết nối Remote"""
+    """Ghi nháº­n báº¯t Ä‘áº§u phiÃªn káº¿t ná»‘i Remote"""
     try:
         query = text("""
-            INSERT INTO dbo.RemoteSessions (request_id, it_user_id, target_user_id, source_device_id, target_device_id, connection_type, start_time, status)
-            VALUES (:rid, :it, :target, :sdev, :tdev, :ctype, SYSDATETIME(), 'started')
+            INSERT INTO RemoteSessions (request_id, it_user_id, target_user_id, source_device_id, target_device_id, connection_type, start_time, status)
+            VALUES (:rid, :it, :target, :sdev, :tdev, :ctype, CURRENT_TIMESTAMP, 'started')
         """)
         db.execute(query, {
             "rid": req.request_id, "it": req.it_user_id, "target": req.target_user_id,
             "sdev": req.source_device_id, "tdev": req.target_device_id, "ctype": req.connection_type
         })
         db.commit()
-        
-        # Lấy session_id vừa tạo
-        new_id = db.execute(text("SELECT @@IDENTITY")).fetchone()[0]
-        return {"message": "Ghi nhận bắt đầu phiên thành công", "session_id": new_id}
+
+        # Láº¥y session_id vá»«a táº¡o
+        new_id = db.execute(text("SELECT LAST_INSERT_ID()")).fetchone()[0]
+        return {"message": "Ghi nháº­n báº¯t Ä‘áº§u phiÃªn thÃ nh cÃ´ng", "session_id": new_id}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/sessions/{id}/end")
 def end_session(id: int, req: SessionEnd, db: Session = Depends(get_db)):
-    """Ghi nhận kết thúc phiên, tự động tính duration_seconds"""
+    """Ghi nháº­n káº¿t thÃºc phiÃªn, tá»± Ä‘á»™ng tÃ­nh duration_seconds"""
     try:
         query = text("""
-            UPDATE dbo.RemoteSessions 
-            SET end_time = SYSDATETIME(),
-                duration_seconds = DATEDIFF(second, start_time, SYSDATETIME()),
+            UPDATE RemoteSessions
+            SET end_time = CURRENT_TIMESTAMP,
+                duration_seconds = TIMESTAMPDIFF(SECOND, start_time, CURRENT_TIMESTAMP),
                 quality_score = :score,
                 notes = :notes,
                 status = 'ended'
@@ -864,7 +865,7 @@ def end_session(id: int, req: SessionEnd, db: Session = Depends(get_db)):
         """)
         db.execute(query, {"id": id, "score": req.quality_score, "notes": req.notes})
         db.commit()
-        return {"message": f"Đã kết thúc phiên hỗ trợ #{id} và ghi nhận thời lượng thành công"}
+        return {"message": f"ÄÃ£ káº¿t thÃºc phiÃªn há»— trá»£ #{id} vÃ  ghi nháº­n thá»i lÆ°á»£ng thÃ nh cÃ´ng"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
