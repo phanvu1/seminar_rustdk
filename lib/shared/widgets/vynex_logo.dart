@@ -48,29 +48,33 @@ class VynexLogo extends StatelessWidget {
         ),
         if (showText) ...[
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'VYNEX',
-                style: TextStyle(
-                  fontSize: size * 0.52,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'VYNEX',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: size * 0.52,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                 ),
-              ),
-              Text(
-                'Remote Control & Support',
-                style: TextStyle(
-                  fontSize: size * 0.28,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.3,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                Text(
+                  'Remote Control & Support',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: size * 0.28,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.3,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ],

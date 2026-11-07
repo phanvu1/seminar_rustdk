@@ -2355,7 +2355,7 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
         Future.delayed(Duration.zero, () async {
           final authCheck = await VynexPermissionGuard.verifyPermission(targetId: id!);
           if (!authCheck.allowed) {
-            final mainContext = rootNavigatorKey.currentContext;
+            final mainContext = globalKey.currentContext;
             if (mainContext != null) {
               VynexPermissionGuard.showAccessDeniedDialog(mainContext, authCheck.reason);
             }

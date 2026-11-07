@@ -244,7 +244,7 @@ CREATE TABLE Notifications (
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME NULL,
     CONSTRAINT FK_Notifications_User FOREIGN KEY (user_id) REFERENCES Users(user_id),
-    CONSTRAINT CK_Notifications_Type CHECK (type IN ('support_request','permission_granted','permission_revoked','session_started','session_ended','general'))
+    CONSTRAINT CK_Notifications_Type CHECK (type IN ('support_request','permission_request','permission_granted','permission_revoked','session_started','session_ended','general'))
 ) ENGINE=InnoDB;
 
 /* 10 ActivityLogs: target_type + target_id are polymorphic */

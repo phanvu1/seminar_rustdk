@@ -270,6 +270,38 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> cancelSupportRequest(int requestId) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/cancel');
+      final res = await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] cancelSupportRequest fallback: $e');
+    }
+    return true;
+  }
+
+  Future<bool> rateSupportRequest(int requestId, int rating, String feedback) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/rate');
+      final res = await http.post(
+        uri,
+        headers: _buildHeaders(),
+        body: jsonEncode({'rating': rating, 'feedback': feedback}),
+      ).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] rateSupportRequest fallback: $e');
+    }
+    return true;
+  }
+
   // --- PERMISSIONS ---
   Future<List<PermissionModel>> getPermissions() async {
     try {
@@ -387,12 +419,73 @@ class ApiService extends ChangeNotifier {
     return MockDataService().departments;
   }
 
-  // --- NOTIFICATIONS ---
-  Future<List<NotificationModel>> getNotifications() async {
-    return MockDataService().notifications;
+  // --- NOTIFICATIONS (THEO TAB 2, TAB 3 & LỖI 2.2) ---
+  Future<List<NotificationModel>> getNotifications({int? userId, UserRole? role}) async {
+    try {
+      final roleStr = role == UserRole.admin
+          ? 'admin'
+          : (role == UserRole.it ? 'it' : 'employee');
+      final uri = Uri.parse('$_baseUrl/api/notifications?user_id=${userId ?? 0}&role=$roleStr');
+      final res = await http.get(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(res.bodyBytes));
+        final list = (json['data'] as List).map((e) => NotificationModel.fromJson(e)).toList();
+        _isBackendConnected = true;
+        notifyListeners();
+        return list;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] getNotifications fallback: $e');
+    }
+
+    // FALLBACK LỌC CHUẨN 3 VAI TRÒ (RBAC NOTIFICATIONS):
+    final allNotifs = MockDataService().notifications;
+    if (role == UserRole.admin) {
+      // 1. Admin: Nhận và xem được mọi thông báo trong hệ thống
+      return List<NotificationModel>.from(allNotifs);
+    } else if (role == UserRole.it) {
+      // 2. IT Staff: Chỉ nhận thông báo yêu cầu hỗ trợ mới từ nhân viên,
+      // thông báo Admin cấp/thu hồi quyền, và thông báo liên quan trực tiếp đến phiên của IT
+      return allNotifs.where((n) {
+        if (n.type == 'support_request') return true;
+        if (n.type == 'permission_granted' || n.type == 'permission_revoked') {
+          return userId == null || n.userId == userId || n.userId == 2;
+        }
+        if (n.type == 'session_started' || n.type == 'session_ended') {
+          return userId == null || n.userId == userId || n.userId == 2;
+        }
+        if (n.type == 'permission_request') {
+          return n.userId == userId;
+        }
+        return false;
+      }).toList();
+    } else {
+      // 3. Nhân viên: CHỈ nhận thông báo phản hồi về trạng thái yêu cầu của chính mình
+      return allNotifs.where((n) {
+        return userId != null && n.userId == userId;
+      }).toList();
+    }
   }
 
-  void markNotificationAsRead(int id) {
+  Future<bool> sendNotification(NotificationModel notif) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/notifications');
+      await http.post(
+        uri,
+        headers: _buildHeaders(),
+        body: jsonEncode(notif.toJson()),
+      ).timeout(AppConstants.apiTimeout);
+    } catch (_) {}
+    MockDataService().notifications.insert(0, notif);
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> markNotificationAsRead(int id) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/notifications/$id/read');
+      await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+    } catch (_) {}
     final idx = MockDataService().notifications.indexWhere((n) => n.notificationId == id);
     if (idx != -1) {
       MockDataService().notifications[idx] = MockDataService().notifications[idx].copyWith(isRead: true);
@@ -400,9 +493,15 @@ class ApiService extends ChangeNotifier {
     }
   }
 
-  void markAllNotificationsAsRead() {
+  Future<void> markAllNotificationsAsRead({int? userId}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/notifications/read-all${userId != null ? '?user_id=$userId' : ''}');
+      await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+    } catch (_) {}
     for (int i = 0; i < MockDataService().notifications.length; i++) {
-      MockDataService().notifications[i] = MockDataService().notifications[i].copyWith(isRead: true);
+      if (userId == null || MockDataService().notifications[i].userId == userId) {
+        MockDataService().notifications[i] = MockDataService().notifications[i].copyWith(isRead: true);
+      }
     }
     notifyListeners();
   }

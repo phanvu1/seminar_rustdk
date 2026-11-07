@@ -12,6 +12,7 @@ import 'features/auth/login_page.dart';
 import 'features/overview_connect/overview_page.dart';
 import 'features/devices/devices_page.dart';
 import 'features/support_tickets/support_tickets_page.dart';
+import 'features/support_tickets/employee_support_page.dart';
 import 'features/permissions/permissions_page.dart';
 import 'features/users_depts/users_depts_page.dart';
 import 'features/reports_logs/reports_logs_page.dart';
@@ -95,31 +96,53 @@ class _DashboardShellState extends State<DashboardShell> {
       return const LoginPage();
     }
 
+    final isEmployee = auth.activeRole == UserRole.employee;
+
+    // Phân định nghiêm ngặt luồng giao diện theo Lỗi 2.4:
+    // Nhân viên tuyệt đối không được truy cập Overview hoặc các màn hình quản trị
+    String currentRoute = _activeRoute;
+    if (isEmployee) {
+      if (currentRoute != 'employee_create_ticket' && currentRoute != 'employee_my_tickets') {
+        currentRoute = 'employee_my_tickets';
+      }
+    } else {
+      if (currentRoute == 'employee_create_ticket' || currentRoute == 'employee_my_tickets') {
+        currentRoute = 'overview';
+      }
+    }
+
     Widget activePage;
-    switch (_activeRoute) {
-      case 'overview':
-        activePage = OverviewPage(onNavigate: _navigateTo);
-        break;
-      case 'tickets':
-        activePage = const SupportTicketsPage();
-        break;
-      case 'devices':
-        activePage = const DevicesPage();
-        break;
-      case 'permissions':
-        activePage = const PermissionsPage();
-        break;
-      case 'users':
-        activePage = const UsersDeptsPage();
-        break;
-      case 'reports':
-        activePage = const ReportsLogsPage();
-        break;
-      case 'settings':
-        activePage = const SettingsPage();
-        break;
-      default:
-        activePage = OverviewPage(onNavigate: _navigateTo);
+    if (isEmployee) {
+      activePage = EmployeeSupportPage(
+        viewMode: currentRoute,
+        onSwitchView: _navigateTo,
+      );
+    } else {
+      switch (currentRoute) {
+        case 'overview':
+          activePage = OverviewPage(onNavigate: _navigateTo);
+          break;
+        case 'tickets':
+          activePage = const SupportTicketsPage();
+          break;
+        case 'devices':
+          activePage = const DevicesPage();
+          break;
+        case 'permissions':
+          activePage = const PermissionsPage();
+          break;
+        case 'users':
+          activePage = const UsersDeptsPage();
+          break;
+        case 'reports':
+          activePage = const ReportsLogsPage();
+          break;
+        case 'settings':
+          activePage = const SettingsPage();
+          break;
+        default:
+          activePage = OverviewPage(onNavigate: _navigateTo);
+      }
     }
 
     return Scaffold(
@@ -127,7 +150,7 @@ class _DashboardShellState extends State<DashboardShell> {
         children: [
           // Left Sidebar
           Sidebar(
-            activeRoute: _activeRoute,
+            activeRoute: currentRoute,
             onSelectRoute: _navigateTo,
             isCollapsed: _isSidebarCollapsed,
             isDark: widget.isDark,

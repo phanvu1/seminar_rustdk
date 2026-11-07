@@ -154,9 +154,9 @@ class TopBar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Notification Bell
+          // Notification Bell (Phân quyền 3 vai trò theo Lỗi 2.2)
           FutureBuilder<List<NotificationModel>>(
-            future: api.getNotifications(),
+            future: api.getNotifications(userId: user.userId, role: activeRole),
             builder: (context, snapshot) {
               final list = snapshot.data ?? [];
               final unreadCount = list.where((n) => !n.isRead).length;
@@ -230,7 +230,9 @@ class TopBar extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () {
-                              api.markAllNotificationsAsRead();
+                              api.markAllNotificationsAsRead(
+                                userId: activeRole == UserRole.admin ? null : user.userId,
+                              );
                               Navigator.pop(context);
                             },
                             child: const Text('Đọc tất cả', style: TextStyle(fontSize: 12)),
@@ -247,7 +249,7 @@ class TopBar extends StatelessWidget {
                         ),
                       )
                     else
-                      ...list.take(5).map((n) {
+                      ...list.take(6).map((n) {
                         return PopupMenuItem(
                           onTap: () {
                             api.markNotificationAsRead(n.notificationId);
@@ -263,7 +265,9 @@ class TopBar extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: n.isRead
                                         ? Colors.grey.withOpacity(0.1)
-                                        : AppConstants.primaryBlue.withOpacity(0.15),
+                                        : (n.type == 'permission_request'
+                                            ? const Color(0xFFF59E0B).withOpacity(0.15)
+                                            : AppConstants.primaryBlue.withOpacity(0.15)),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -271,9 +275,15 @@ class TopBar extends StatelessWidget {
                                         ? Icons.support_agent_rounded
                                         : (n.type == 'permission_granted'
                                             ? Icons.vpn_key_rounded
-                                            : Icons.info_outline_rounded),
+                                            : (n.type == 'permission_request'
+                                                ? Icons.lock_clock_rounded
+                                                : Icons.info_outline_rounded)),
                                     size: 16,
-                                    color: n.isRead ? Colors.grey : AppConstants.primaryBlue,
+                                    color: n.isRead
+                                        ? Colors.grey
+                                        : (n.type == 'permission_request'
+                                            ? const Color(0xFFF59E0B)
+                                            : AppConstants.primaryBlue),
                                   ),
                                 ),
                                 const SizedBox(width: 10),

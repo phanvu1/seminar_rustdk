@@ -224,6 +224,13 @@ class SessionEnd(BaseModel):
     quality_score: Optional[int] = 5
     notes: Optional[str] = "Phiên hỗ trợ hoàn tất"
 
+class NotificationCreate(BaseModel):
+    user_id: int
+    title: str
+    content: Optional[str] = ""
+    type: str = "general" # support_request, permission_request, permission_granted, permission_revoked, session_started, session_ended, general
+    reference_id: Optional[int] = None
+
 # =====================================================================
 # 4. API ENDPOINTS (ROUTES ĐẦY ĐỦ 100%)
 # =====================================================================
@@ -492,7 +499,7 @@ def get_support_requests(db: Session = Depends(get_db)):
 
 @app.post("/api/support-requests")
 def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_db)):
-    """Nhân viên gửi yêu cầu hỗ trợ kỹ thuật mới"""
+    """Nhân viên gửi yêu cầu hỗ trợ kỹ thuật mới (Lỗi 2.5)"""
     try:
         query = text("""
             INSERT INTO dbo.SupportRequests (employee_id, device_id, title, description, priority, status)
@@ -503,6 +510,24 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
             "d": req.description, "p": req.priority
         })
         db.commit()
+
+        # Tự động gửi thông báo cho IT Staff và Admin
+        try:
+            req_id_row = db.execute(text("SELECT @@IDENTITY")).fetchone()
+            req_id = req_id_row[0] if req_id_row else None
+            notif_query = text("""
+                INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                VALUES (2, :t, :c, 'support_request', :ref, 0, SYSDATETIME())
+            """)
+            db.execute(notif_query, {
+                "t": f"Yêu cầu hỗ trợ mới #{req_id or ''}: {req.title}",
+                "c": f"Nhân viên ID #{req.employee_id} đã gửi yêu cầu: \"{req.title}\"",
+                "ref": req_id
+            })
+            db.commit()
+        except Exception:
+            pass
+
         return {"message": "Gửi yêu cầu hỗ trợ thành công. Kỹ thuật viên IT sẽ tiếp nhận xử lý."}
     except Exception as e:
         db.rollback()
@@ -519,6 +544,25 @@ def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depe
         """)
         res = db.execute(query, {"id": id, "it": it_id})
         db.commit()
+
+        # Gửi thông báo cho Nhân viên tạo ticket
+        try:
+            emp_row = db.execute(text("SELECT employee_id, title FROM dbo.SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
+            if emp_row:
+                emp_id, title = emp_row
+                db.execute(text("""
+                    INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'support_request', :ref, 0, SYSDATETIME())
+                """), {
+                    "uid": emp_id,
+                    "t": f"Yêu cầu #{id} đã được tiếp nhận",
+                    "c": f"Kỹ thuật viên IT đã tiếp nhận xử lý sự cố \"{title}\".",
+                    "ref": id
+                })
+                db.commit()
+        except Exception:
+            pass
+
         return {"message": f"IT đã tiếp nhận ticket #{id}"}
     except Exception as e:
         db.rollback()
@@ -559,6 +603,25 @@ def complete_support_request(id: int, db: Session = Depends(get_db)):
         """)
         db.execute(query, {"id": id})
         db.commit()
+
+        # Gửi thông báo cho Nhân viên vào đánh giá sao
+        try:
+            emp_row = db.execute(text("SELECT employee_id, title FROM dbo.SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
+            if emp_row:
+                emp_id, title = emp_row
+                db.execute(text("""
+                    INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'session_ended', :ref, 0, SYSDATETIME())
+                """), {
+                    "uid": emp_id,
+                    "t": f"Phiên hỗ trợ #{id} hoàn tất",
+                    "c": f"Yêu cầu \"{title}\" đã được IT xử lý xong. Vui lòng đánh giá chất lượng phục vụ 1-5 sao.",
+                    "ref": id
+                })
+                db.commit()
+        except Exception:
+            pass
+
         return {"message": f"Đã hoàn thành ticket #{id}. Đang chờ nhân viên đánh giá."}
     except Exception as e:
         db.rollback()
@@ -623,6 +686,24 @@ def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
             "hours": req.duration_hours, "notes": req.notes
         })
         db.commit()
+
+        # Gửi thông báo cho IT Staff
+        try:
+            dev_row = db.execute(text("SELECT device_name FROM dbo.Devices WHERE device_id = :did"), {"did": req.device_id}).fetchone()
+            dname = dev_row[0] if dev_row else f"Thiết bị #{req.device_id}"
+            db.execute(text("""
+                INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                VALUES (:uid, :t, :c, 'permission_granted', :ref, 0, SYSDATETIME())
+            """), {
+                "uid": req.user_id,
+                "t": f"Admin đã cấp quyền máy {dname}",
+                "c": f"Bạn đã được cấp quyền '{req.permission_type}' thời hạn {req.duration_hours}h trên máy {dname}.",
+                "ref": req.device_id
+            })
+            db.commit()
+        except Exception:
+            pass
+
         return {"message": f"Đã cấp quyền '{req.permission_type}' thời hạn {req.duration_hours}h thành công"}
     except Exception as e:
         db.rollback()
@@ -632,6 +713,8 @@ def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
 def revoke_permission(id: int, db: Session = Depends(get_db)):
     """Admin chủ động thu hồi quyền trước hạn"""
     try:
+        perm_row = db.execute(text("SELECT user_id, device_id FROM dbo.Permissions WHERE permission_id = :id"), {"id": id}).fetchone()
+        
         query = text("""
             UPDATE dbo.Permissions 
             SET revoked_at = SYSDATETIME(), status = 0 
@@ -639,6 +722,24 @@ def revoke_permission(id: int, db: Session = Depends(get_db)):
         """)
         db.execute(query, {"id": id})
         db.commit()
+
+        # Gửi thông báo cho IT Staff về việc thu hồi quyền
+        if perm_row:
+            try:
+                uid, did = perm_row
+                db.execute(text("""
+                    INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'permission_revoked', :ref, 0, SYSDATETIME())
+                """), {
+                    "uid": uid,
+                    "t": f"Quyền điều khiển máy #{did} đã bị thu hồi",
+                    "c": f"Admin đã thu hồi quyền truy cập thiết bị #{did}.",
+                    "ref": did
+                })
+                db.commit()
+            except Exception:
+                pass
+
         return {"message": f"Đã thu hồi quyền ID #{id}"}
     except Exception as e:
         db.rollback()
@@ -764,6 +865,103 @@ def end_session(id: int, req: SessionEnd, db: Session = Depends(get_db)):
         db.execute(query, {"id": id, "score": req.quality_score, "notes": req.notes})
         db.commit()
         return {"message": f"Đã kết thúc phiên hỗ trợ #{id} và ghi nhận thời lượng thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+# =====================================================================
+# 5. NHÓM 8: THÔNG BÁO HỆ THỐNG (NOTIFICATIONS - THEO TAB 2, TAB 3 & LỖI 2.2)
+# =====================================================================
+
+@app.get("/api/notifications")
+def get_notifications(user_id: Optional[int] = None, role: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Phân quyền xem thông báo chuẩn 3 vai trò (Lỗi 2.2):
+    - Admin: Nhận và xem được mọi thông báo trong hệ thống.
+    - IT Staff: Nhận thông báo yêu cầu hỗ trợ mới, cấp/thu hồi quyền, và phiên kết nối.
+    - Employee: CHỈ nhận thông báo phản hồi về trạng thái yêu cầu của chính mình.
+    """
+    try:
+        norm_role = (role or "").lower()
+        if norm_role == "admin" or (user_id == 1 and not norm_role):
+            query = text("""
+                SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
+                FROM dbo.Notifications
+                ORDER BY notification_id DESC
+            """)
+            rows = db.execute(query).fetchall()
+        elif norm_role in ["it", "it_staff"] or user_id == 2:
+            query = text("""
+                SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
+                FROM dbo.Notifications
+                WHERE type IN ('support_request', 'session_started', 'session_ended')
+                   OR (type IN ('permission_granted', 'permission_revoked', 'permission_request') AND (:uid = 0 OR user_id = :uid))
+                   OR (:uid != 0 AND user_id = :uid)
+                ORDER BY notification_id DESC
+            """)
+            rows = db.execute(query, {"uid": user_id or 0}).fetchall()
+        else:
+            query = text("""
+                SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
+                FROM dbo.Notifications
+                WHERE user_id = :uid
+                ORDER BY notification_id DESC
+            """)
+            rows = db.execute(query, {"uid": user_id or 0}).fetchall()
+
+        return {"data": [{
+            "notification_id": r[0],
+            "user_id": r[1],
+            "title": r[2],
+            "content": r[3],
+            "type": r[4],
+            "reference_id": r[5],
+            "is_read": bool(r[6]),
+            "created_at": str(r[7])
+        } for r in rows]}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+@app.post("/api/notifications")
+def create_notification(req: NotificationCreate, db: Session = Depends(get_db)):
+    """Tạo thông báo mới (IT xin cấp quyền, Nhân viên gửi ticket...)"""
+    try:
+        query = text("""
+            INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+            VALUES (:uid, :t, :c, :type, :ref, 0, SYSDATETIME())
+        """)
+        db.execute(query, {
+            "uid": req.user_id, "t": req.title, "c": req.content,
+            "type": req.type, "ref": req.reference_id
+        })
+        db.commit()
+        return {"message": "Tạo thông báo thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/notifications/{id}/read")
+def mark_notification_read(id: int, db: Session = Depends(get_db)):
+    try:
+        query = text("UPDATE dbo.Notifications SET is_read = 1, read_at = SYSDATETIME() WHERE notification_id = :id")
+        db.execute(query, {"id": id})
+        db.commit()
+        return {"message": f"Đã đánh dấu đọc thông báo #{id}"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/notifications/read-all")
+def mark_all_notifications_read(user_id: Optional[int] = None, db: Session = Depends(get_db)):
+    try:
+        if user_id:
+            query = text("UPDATE dbo.Notifications SET is_read = 1, read_at = SYSDATETIME() WHERE user_id = :uid AND is_read = 0")
+            db.execute(query, {"uid": user_id})
+        else:
+            query = text("UPDATE dbo.Notifications SET is_read = 1, read_at = SYSDATETIME() WHERE is_read = 0")
+            db.execute(query)
+        db.commit()
+        return {"message": "Đã đánh dấu đọc toàn bộ thông báo"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))

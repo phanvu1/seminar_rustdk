@@ -21,6 +21,7 @@ class VynexLauncherService {
     final List<String> possiblePaths = [
       // 1. Thư mục bundle client chuyên biệt trong build output
       '${Directory.current.path}\\build\\windows\\x64\\runner\\Release\\vynex_client\\vynex_client.exe',
+      '${Directory.current.path}\\dist\\Vynex_Client\\vynex_client.exe',
       // 2. Thư mục build RustDesk Release trong dự án (chứa trọn vẹn DLLs + data)
       'D:\\Dabeo\\work\\seminar_rustdk\\rustdesk\\flutter\\build\\windows\\x64\\runner\\Release\\vynex_client.exe',
       'D:\\Dabeo\\work\\seminar_rustdk\\rustdesk\\flutter\\build\\windows\\x64\\runner\\Release\\rustdesk.exe',
@@ -36,8 +37,9 @@ class VynexLauncherService {
     try {
       final currentExeDir = File(Platform.resolvedExecutable).parent.path;
       possiblePaths.insert(0, '$currentExeDir\\vynex_client\\vynex_client.exe');
-      possiblePaths.insert(1, '$currentExeDir\\vynex_client.exe');
-      possiblePaths.insert(2, '$currentExeDir\\rustdesk.exe');
+      possiblePaths.insert(1, '$currentExeDir\\..\\Vynex_Client\\vynex_client.exe');
+      possiblePaths.insert(2, '$currentExeDir\\vynex_client.exe');
+      possiblePaths.insert(3, '$currentExeDir\\rustdesk.exe');
     } catch (_) {}
 
     for (final path in possiblePaths) {

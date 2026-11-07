@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../core/network/api_service.dart';
 import '../models/permission_model.dart';
+import '../models/notification_model.dart';
 import 'mock_data_service.dart';
 
 class PermissionService extends ChangeNotifier {
@@ -10,10 +11,13 @@ class PermissionService extends ChangeNotifier {
   PermissionService._internal();
 
   List<PermissionModel> _permissions = [];
+  final Set<int> _pendingRequestedDeviceIds = {};
   bool _isLoading = false;
 
   List<PermissionModel> get permissions => _permissions;
   bool get isLoading => _isLoading;
+
+  bool hasRequestedPermission(int deviceId) => _pendingRequestedDeviceIds.contains(deviceId);
 
   Future<void> fetchPermissions() async {
     _isLoading = true;
@@ -106,6 +110,33 @@ class PermissionService extends ChangeNotifier {
     final success = await ApiService().grantPermission(newPermission);
     await fetchPermissions();
     return success;
+  }
+
+  // IT Staff requests permission from Admin (Lỗi 2.3)
+  Future<bool> requestPermission({
+    required int itUserId,
+    required String itName,
+    required int deviceId,
+    required String deviceName,
+    required String vynexId,
+    String? reason,
+  }) async {
+    _pendingRequestedDeviceIds.add(deviceId);
+    notifyListeners();
+
+    final notif = NotificationModel(
+      notificationId: DateTime.now().millisecondsSinceEpoch % 100000,
+      userId: 1, // Gửi tới Admin
+      title: 'IT $itName yêu cầu cấp quyền điều khiển máy $deviceName',
+      content: 'IT $itName yêu cầu cấp quyền điều khiển máy $deviceName (ID: $vynexId). Lý do: ${reason ?? "Hỗ trợ xử lý sự cố kỹ thuật"}',
+      type: 'permission_request',
+      referenceId: deviceId,
+      isRead: false,
+      createdAt: DateTime.now(),
+    );
+
+    await ApiService().sendNotification(notif);
+    return true;
   }
 
   // Admin revokes permission

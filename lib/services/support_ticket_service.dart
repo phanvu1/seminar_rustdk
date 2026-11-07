@@ -23,7 +23,7 @@ class SupportTicketService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Employee creates new ticket
+  // Employee creates new ticket (Sửa triệt để Lỗi 2.5)
   Future<bool> createTicket({
     required int employeeId,
     required String employeeName,
@@ -49,9 +49,33 @@ class SupportTicketService extends ChangeNotifier {
       createdAt: DateTime.now(),
     );
 
+    // Chèn ngay lập tức vào đầu danh sách UI và MockDataService để hiển thị tức thì
+    _tickets.insert(0, ticket);
+    if (!MockDataService().supportRequests.any((t) => t.requestId == newId)) {
+      MockDataService().supportRequests.insert(0, ticket);
+    }
+    notifyListeners();
+
+    // Đồng bộ Database qua Backend API
     final success = await ApiService().createSupportRequest(ticket);
     await fetchTickets();
     return success;
+  }
+
+  // Employee cancels pending ticket (Lỗi 2.4 & 2.5)
+  Future<bool> cancelTicket(int requestId) async {
+    final idx = _tickets.indexWhere((t) => t.requestId == requestId);
+    if (idx != -1) {
+      _tickets[idx] = _tickets[idx].copyWith(status: 'cancelled');
+      final mockIdx = MockDataService().supportRequests.indexWhere((t) => t.requestId == requestId);
+      if (mockIdx != -1) {
+        MockDataService().supportRequests[mockIdx] = _tickets[idx];
+      }
+      notifyListeners();
+      await ApiService().cancelSupportRequest(requestId);
+      return true;
+    }
+    return false;
   }
 
   // IT Staff accepts ticket
@@ -188,6 +212,7 @@ class SupportTicketService extends ChangeNotifier {
         MockDataService().supportRequests[mockIdx] = _tickets[idx];
       }
       notifyListeners();
+      await ApiService().rateSupportRequest(requestId, rating, feedback);
       return true;
     }
     return false;

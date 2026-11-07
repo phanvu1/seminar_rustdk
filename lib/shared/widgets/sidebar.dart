@@ -32,50 +32,75 @@ class Sidebar extends StatelessWidget {
     this.isDark = true,
   }) : super(key: key);
 
-  static const List<SidebarItem> menuItems = [
-    SidebarItem(
-      id: 'overview',
-      title: 'Tổng quan & Kết nối',
-      icon: Icons.dashboard_rounded,
-      allowedRoles: [UserRole.admin, UserRole.it, UserRole.employee],
-    ),
-    SidebarItem(
-      id: 'tickets',
-      title: 'Yêu cầu Hỗ trợ',
-      icon: Icons.support_agent_rounded,
-      allowedRoles: [UserRole.admin, UserRole.it, UserRole.employee],
-    ),
-    SidebarItem(
-      id: 'devices',
-      title: 'Quản lý Thiết bị',
-      icon: Icons.devices_rounded,
-      allowedRoles: [UserRole.admin, UserRole.it],
-    ),
-    SidebarItem(
-      id: 'permissions',
-      title: 'Phân quyền IT - Thiết bị',
-      icon: Icons.vpn_key_rounded,
-      allowedRoles: [UserRole.admin],
-    ),
-    SidebarItem(
-      id: 'users',
-      title: 'Nhân sự & Phòng ban',
-      icon: Icons.people_alt_rounded,
-      allowedRoles: [UserRole.admin],
-    ),
-    SidebarItem(
-      id: 'reports',
-      title: 'Báo cáo & Lịch sử',
-      icon: Icons.insights_rounded,
-      allowedRoles: [UserRole.admin],
-    ),
-    SidebarItem(
-      id: 'settings',
-      title: 'Cấu hình Hệ thống',
-      icon: Icons.settings_rounded,
-      allowedRoles: [UserRole.admin, UserRole.it],
-    ),
-  ];
+  static List<SidebarItem> getMenuItemsForRole(UserRole role) {
+    if (role == UserRole.employee) {
+      // THEO LỖI 2.4: Thanh điều hướng (Sidebar) của Nhân viên CHỈ ĐƯỢC PHÉP có 2 danh mục chính:
+      // 1. "Yêu cầu hỗ trợ" (Tạo yêu cầu hỗ trợ mới)
+      // 2. "Lịch sử yêu cầu của tôi" (Xem danh sách, hủy pending, đánh giá sao completed)
+      // XÓA BỎ HOÀN TOÀN "Tổng quan & Kết nối"
+      return const [
+        SidebarItem(
+          id: 'employee_create_ticket',
+          title: 'Yêu cầu hỗ trợ',
+          icon: Icons.add_circle_outline_rounded,
+          allowedRoles: [UserRole.employee],
+        ),
+        SidebarItem(
+          id: 'employee_my_tickets',
+          title: 'Lịch sử yêu cầu của tôi',
+          icon: Icons.history_rounded,
+          allowedRoles: [UserRole.employee],
+        ),
+      ];
+    }
+
+    const allItems = [
+      SidebarItem(
+        id: 'overview',
+        title: 'Tổng quan & Kết nối',
+        icon: Icons.dashboard_rounded,
+        allowedRoles: [UserRole.admin, UserRole.it],
+      ),
+      SidebarItem(
+        id: 'tickets',
+        title: 'Yêu cầu Hỗ trợ',
+        icon: Icons.support_agent_rounded,
+        allowedRoles: [UserRole.admin, UserRole.it],
+      ),
+      SidebarItem(
+        id: 'devices',
+        title: 'Quản lý Thiết bị',
+        icon: Icons.devices_rounded,
+        allowedRoles: [UserRole.admin, UserRole.it],
+      ),
+      SidebarItem(
+        id: 'permissions',
+        title: 'Phân quyền IT - Thiết bị',
+        icon: Icons.vpn_key_rounded,
+        allowedRoles: [UserRole.admin],
+      ),
+      SidebarItem(
+        id: 'users',
+        title: 'Nhân sự & Phòng ban',
+        icon: Icons.people_alt_rounded,
+        allowedRoles: [UserRole.admin],
+      ),
+      SidebarItem(
+        id: 'reports',
+        title: 'Báo cáo & Lịch sử',
+        icon: Icons.insights_rounded,
+        allowedRoles: [UserRole.admin],
+      ),
+      SidebarItem(
+        id: 'settings',
+        title: 'Cấu hình Hệ thống',
+        icon: Icons.settings_rounded,
+        allowedRoles: [UserRole.admin, UserRole.it],
+      ),
+    ];
+
+    return allItems.where((item) => item.allowedRoles.contains(role)).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +108,7 @@ class Sidebar extends StatelessWidget {
     final activeRole = auth.activeRole;
     final width = isCollapsed ? 76.0 : 260.0;
 
-    final visibleItems = menuItems.where((item) => item.allowedRoles.contains(activeRole)).toList();
+    final visibleItems = getMenuItemsForRole(activeRole);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -192,12 +217,15 @@ class Sidebar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Vynex Relay Server',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                      const Expanded(
+                        child: Text(
+                          'Vynex Relay Server',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],

@@ -228,12 +228,21 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 child: const Text('Đóng'),
               ),
               OutlinedButton.icon(
-                onPressed: () {
+                onPressed: () async {
+                  await permService.requestPermission(
+                    itUserId: auth.currentUser.userId,
+                    itName: auth.currentUser.fullName,
+                    deviceId: ticket.deviceId,
+                    deviceName: ticket.deviceName,
+                    vynexId: ticket.vynexId,
+                    reason: 'Xử lý sự cố ticket #${ticket.requestId}: ${ticket.title}',
+                  );
+                  if (!mounted) return;
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Đã gửi yêu cầu cấp quyền điều khiển máy "${ticket.deviceName}" tới Admin.'),
-                      backgroundColor: const Color(0xFF3B82F6),
+                      content: Text('Đã gửi yêu cầu xin cấp quyền điều khiển máy "${ticket.deviceName}" tới Admin.'),
+                      backgroundColor: const Color(0xFFF59E0B),
                     ),
                   );
                 },
@@ -691,15 +700,57 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                               ],
                             ),
                           ] else if (ticket.status == 'accepted' || ticket.status == 'in_progress') ...[
-                            ElevatedButton.icon(
-                              onPressed: () => _handleItConnect(context, ticket),
-                              icon: const Icon(Icons.cast_connected_rounded, size: 16),
-                              label: const Text('Bắt Đầu Kết Nối Từ Xa'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppConstants.primaryBlue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final permService = Provider.of<PermissionService>(context);
+                                final hasPerm = permService.hasPermission(auth.currentUser.userId, ticket.deviceId);
+                                final hasRequested = permService.hasRequestedPermission(ticket.deviceId);
+
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (!hasPerm) ...[
+                                      ElevatedButton.icon(
+                                        onPressed: () async {
+                                          await permService.requestPermission(
+                                            itUserId: auth.currentUser.userId,
+                                            itName: auth.currentUser.fullName,
+                                            deviceId: ticket.deviceId,
+                                            deviceName: ticket.deviceName,
+                                            vynexId: ticket.vynexId,
+                                            reason: 'Xử lý sự cố ticket #${ticket.requestId}: ${ticket.title}',
+                                          );
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
+                                              backgroundColor: Color(0xFFF59E0B),
+                                            ),
+                                          );
+                                        },
+                                        icon: Icon(hasRequested ? Icons.hourglass_top_rounded : Icons.vpn_key_rounded, size: 16),
+                                        label: Text(hasRequested ? 'Đã gửi yêu cầu tới Admin' : 'Yêu cầu cấp quyền kết nối'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: hasRequested ? const Color(0xFFD97706) : const Color(0xFFF59E0B),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    ElevatedButton.icon(
+                                      onPressed: () => _handleItConnect(context, ticket),
+                                      icon: const Icon(Icons.cast_connected_rounded, size: 16),
+                                      label: Text(hasPerm ? 'Kết Nối Ngay' : 'Kết Nối'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: hasPerm ? const Color(0xFF10B981) : AppConstants.primaryBlue,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ] else if (ticket.status == 'completed' && ticket.rating == null && role == UserRole.employee) ...[
                             ElevatedButton.icon(

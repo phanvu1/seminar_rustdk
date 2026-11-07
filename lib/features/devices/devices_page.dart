@@ -465,100 +465,155 @@ class _DevicesPageState extends State<DevicesPage> {
                       const SizedBox(width: 16),
 
                       // Actions
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final auth = Provider.of<AuthService>(context, listen: false);
-                              final permService = Provider.of<PermissionService>(context, listen: false);
-                              final hasPerm = permService.hasPermission(auth.currentUser.userId, dev.deviceId);
+                      Consumer<PermissionService>(
+                        builder: (context, permService, _) {
+                          final auth = Provider.of<AuthService>(context);
+                          final hasPerm = permService.hasPermission(auth.currentUser.userId, dev.deviceId);
+                          final hasRequested = permService.hasRequestedPermission(dev.deviceId);
 
-                              if (!hasPerm) {
-                                showDialog(
-                                  context: context,
-                                  builder: (c) => AlertDialog(
-                                    backgroundColor: const Color(0xFF1E293B),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    title: const Row(
-                                      children: [
-                                        Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
-                                        SizedBox(width: 8),
-                                        Text('Chưa Có Quyền Truy Cập', style: TextStyle(color: Colors.white, fontSize: 16)),
-                                      ],
-                                    ),
-                                    content: Text(
-                                      'Bạn chưa được cấp quyền điều khiển máy "${dev.name}" (${dev.vynexId}).',
-                                      style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(c),
-                                        child: const Text('Đóng'),
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!hasPerm && (auth.activeRole == UserRole.it || auth.activeRole == UserRole.admin)) ...[
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await permService.requestPermission(
+                                      itUserId: auth.currentUser.userId,
+                                      itName: auth.currentUser.fullName,
+                                      deviceId: dev.deviceId,
+                                      deviceName: dev.name,
+                                      vynexId: dev.vynexId,
+                                      reason: 'Yêu cầu quyền điều khiển từ xa thiết bị ${dev.name}',
+                                    );
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
+                                        backgroundColor: Color(0xFFF59E0B),
                                       ),
-                                      ElevatedButton(
-                                        onPressed: () async {
-                                          await permService.grantPermission(
-                                            itUserId: auth.currentUser.userId,
-                                            itName: auth.currentUser.fullName,
-                                            deviceId: dev.deviceId,
-                                            deviceName: dev.name,
-                                            vynexId: dev.vynexId,
-                                            permissionType: 'control',
-                                            durationType: '24h',
-                                          );
-                                          if (!mounted) return;
-                                          Navigator.pop(c);
-                                        },
-                                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
-                                        child: const Text('[Demo] Cấp Quyền 24h'),
+                                    );
+                                  },
+                                  icon: Icon(hasRequested ? Icons.hourglass_top_rounded : Icons.vpn_key_rounded, size: 14),
+                                  label: Text(hasRequested ? 'Đã gửi yêu cầu' : 'Yêu cầu cấp quyền kết nối'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: hasRequested ? const Color(0xFFD97706) : const Color(0xFFF59E0B),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  if (!hasPerm) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        backgroundColor: const Color(0xFF1E293B),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.gpp_bad_rounded, color: Color(0xFFEF4444)),
+                                            SizedBox(width: 8),
+                                            Text('Chưa Có Quyền Truy Cập', style: TextStyle(color: Colors.white, fontSize: 16)),
+                                          ],
+                                        ),
+                                        content: Text(
+                                          'Bạn chưa được cấp quyền điều khiển máy "${dev.name}" (${dev.vynexId}).',
+                                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(c),
+                                            child: const Text('Đóng'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: () async {
+                                              await permService.requestPermission(
+                                                itUserId: auth.currentUser.userId,
+                                                itName: auth.currentUser.fullName,
+                                                deviceId: dev.deviceId,
+                                                deviceName: dev.name,
+                                                vynexId: dev.vynexId,
+                                                reason: 'Yêu cầu quyền điều khiển máy ${dev.name}',
+                                              );
+                                              if (!mounted) return;
+                                              Navigator.pop(c);
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
+                                                  backgroundColor: Color(0xFFF59E0B),
+                                                ),
+                                              );
+                                            },
+                                            icon: const Icon(Icons.send_rounded, size: 14),
+                                            label: const Text('Gửi yêu cầu tới Admin'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () async {
+                                              await permService.grantPermission(
+                                                itUserId: auth.currentUser.userId,
+                                                itName: auth.currentUser.fullName,
+                                                deviceId: dev.deviceId,
+                                                deviceName: dev.name,
+                                                vynexId: dev.vynexId,
+                                                permissionType: 'control',
+                                                durationType: '24h',
+                                              );
+                                              if (!mounted) return;
+                                              Navigator.pop(c);
+                                            },
+                                            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+                                            child: const Text('[Demo] Cấp Quyền 24h'),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                                return;
-                              }
+                                    );
+                                    return;
+                                  }
 
-                              final token = permService.generateSessionToken(auth.currentUser.userId, dev.deviceId);
-                              final launchResult = await VynexLauncherService.launchClient(
-                                vynexId: dev.vynexId,
-                                token: token,
-                                itUserId: auth.currentUser.userId,
-                              );
+                                  final token = permService.generateSessionToken(auth.currentUser.userId, dev.deviceId);
+                                  final launchResult = await VynexLauncherService.launchClient(
+                                    vynexId: dev.vynexId,
+                                    token: token,
+                                    itUserId: auth.currentUser.userId,
+                                  );
 
-                              if (!mounted) return;
+                                  if (!mounted) return;
 
-                              if (launchResult.success) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đã kích hoạt Vynex Client (.exe) kết nối tới máy ${dev.name} (${dev.vynexId})'),
-                                    backgroundColor: const Color(0xFF10B981),
-                                  ),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(launchResult.message),
-                                    backgroundColor: const Color(0xFFEF4444),
-                                  ),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.cast_connected, size: 14),
-                            label: const Text('Kết Nối'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.primaryBlue,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                            tooltip: 'Xóa thiết bị',
-                            onPressed: () => _showDeleteConfirm(context, dev),
-                          ),
-                        ],
+                                  if (launchResult.success) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Đã kích hoạt Vynex Client (.exe) kết nối tới máy ${dev.name} (${dev.vynexId})'),
+                                        backgroundColor: const Color(0xFF10B981),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(launchResult.message),
+                                        backgroundColor: const Color(0xFFEF4444),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.cast_connected, size: 14),
+                                label: Text(hasPerm ? 'Kết Nối Ngay' : 'Kết Nối'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: hasPerm ? const Color(0xFF10B981) : AppConstants.primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                tooltip: 'Xóa thiết bị',
+                                onPressed: () => _showDeleteConfirm(context, dev),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
