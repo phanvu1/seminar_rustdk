@@ -80,7 +80,7 @@ class ApiService extends ChangeNotifier {
         _isBackendConnected = true;
         _jwtToken = data['token'] ?? 'jwt-vynex-token';
         notifyListeners();
-        return {'success': true, 'data': data, 'isFallback': false};
+        return {'success': true, 'data': data, 'token': _jwtToken, 'isFallback': false};
       }
     } catch (e) {
       debugPrint('[ApiService] login fallback due to: $e');
@@ -253,7 +253,10 @@ class ApiService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[ApiService] createSupportRequest fallback: $e');
     }
-    MockDataService().supportRequests.insert(0, req);
+    // Smart Fallback nếu API chưa kết nối
+    if (!MockDataService().supportRequests.any((t) => t.requestId == req.requestId)) {
+      MockDataService().supportRequests.insert(0, req);
+    }
     MockDataService().notifications.insert(
           0,
           NotificationModel(
@@ -267,6 +270,20 @@ class ApiService extends ChangeNotifier {
           ),
         );
     notifyListeners();
+    return true;
+  }
+
+  Future<bool> acceptSupportRequest(int requestId, int itId) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/accept?it_id=$itId');
+      final res = await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] acceptSupportRequest fallback: $e');
+    }
     return true;
   }
 

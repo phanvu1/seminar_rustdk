@@ -34,7 +34,12 @@ class SupportTicketService extends ChangeNotifier {
     String? description,
     String priority = 'normal',
   }) async {
-    final newId = 100 + MockDataService().supportRequests.length + 1;
+    final existingIds = MockDataService().supportRequests.map((e) => e.requestId).toSet();
+    int newId = 101;
+    while (existingIds.contains(newId) || _tickets.any((t) => t.requestId == newId)) {
+      newId++;
+    }
+
     final ticket = SupportRequestModel(
       requestId: newId,
       employeeId: employeeId,
@@ -48,13 +53,6 @@ class SupportTicketService extends ChangeNotifier {
       status: 'pending',
       createdAt: DateTime.now(),
     );
-
-    // Chèn ngay lập tức vào đầu danh sách UI và MockDataService để hiển thị tức thì
-    _tickets.insert(0, ticket);
-    if (!MockDataService().supportRequests.any((t) => t.requestId == newId)) {
-      MockDataService().supportRequests.insert(0, ticket);
-    }
-    notifyListeners();
 
     // Đồng bộ Database qua Backend API
     final success = await ApiService().createSupportRequest(ticket);
@@ -78,7 +76,7 @@ class SupportTicketService extends ChangeNotifier {
     return false;
   }
 
-  // IT Staff accepts ticket
+  // IT Staff / Admin accepts or assigns ticket
   Future<bool> acceptTicket(int requestId, int itId, String itName) async {
     final idx = _tickets.indexWhere((t) => t.requestId == requestId);
     if (idx != -1) {
@@ -94,6 +92,7 @@ class SupportTicketService extends ChangeNotifier {
         MockDataService().supportRequests[mockIdx] = _tickets[idx];
       }
       notifyListeners();
+      await ApiService().acceptSupportRequest(requestId, itId);
       return true;
     }
     return false;

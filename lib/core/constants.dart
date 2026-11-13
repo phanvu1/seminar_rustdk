@@ -25,8 +25,8 @@ class AppConstants {
   static const Color statusRejected = Color(0xFFEF4444); // Red
   static const Color statusUrgent = Color(0xFFDC2626); // Deep Red
 
-  // API Endpoints Config
-  static String defaultApiBaseUrl = 'http://localhost:8000';
+  // API Endpoints Config (Trỏ thẳng về IP nội bộ VPN của Server trung tâm 10.13.13.1)
+  static String defaultApiBaseUrl = 'http://10.13.13.1:8000';
   static const Duration apiTimeout = Duration(seconds: 4);
 
   // Storage Keys

@@ -160,23 +160,7 @@ class AppTheme {
         color: Color(0xFF0F172A),
       ),
     ),
-    dialogTheme: DialogTheme(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      titleTextStyle: const TextStyle(
-        fontFamily: defaultFont,
-        fontFamilyFallback: fontFallbacks,
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF0F172A),
-      ),
-      contentTextStyle: const TextStyle(
-        fontFamily: defaultFont,
-        fontFamilyFallback: fontFallbacks,
-        fontSize: 13,
-        color: Color(0xFF334155),
-      ),
-    ),
+    // Giao dien phu hop cho moi phien ban Flutter (Windows va Linux)
     dataTableTheme: DataTableThemeData(
       headingTextStyle: const TextStyle(
         fontFamily: defaultFont,
@@ -227,14 +211,6 @@ class AppTheme {
     dividerTheme: const DividerThemeData(
       color: Color(0xFFE2E8F0),
       thickness: 1,
-    ),
-    cardTheme: CardTheme(
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
-      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -303,23 +279,7 @@ class AppTheme {
         color: Color(0xFFF8FAFC),
       ),
     ),
-    dialogTheme: DialogTheme(
-      backgroundColor: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      titleTextStyle: const TextStyle(
-        fontFamily: defaultFont,
-        fontFamilyFallback: fontFallbacks,
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFFF8FAFC),
-      ),
-      contentTextStyle: const TextStyle(
-        fontFamily: defaultFont,
-        fontFamilyFallback: fontFallbacks,
-        fontSize: 13,
-        color: Color(0xFFCBD5E1),
-      ),
-    ),
+    // Dark Data Table
     dataTableTheme: DataTableThemeData(
       headingTextStyle: const TextStyle(
         fontFamily: defaultFont,
@@ -370,14 +330,6 @@ class AppTheme {
     dividerTheme: const DividerThemeData(
       color: Color(0xFF334155),
       thickness: 1,
-    ),
-    cardTheme: CardTheme(
-      color: const Color(0xFF1E293B),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF334155), width: 1),
-      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

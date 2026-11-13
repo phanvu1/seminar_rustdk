@@ -18,22 +18,16 @@ services:
   # Cổng: Cô lập trên giao diện VPN WireGuard 10.13.13.1
   # ----------------------------------------------------------
   hbbs:
-    container_name: hbbs
+    container_name: vynex-hbbs
     image: rustdesk/rustdesk-server:latest
     command: hbbs -r 10.13.13.1:21117
-    ports:
-      # CÔ LẬP CỔNG: Chỉ cho phép lưu lượng đi qua mạng WireGuard VPN 10.13.13.1 (Khóa mạng LAN vật lý)
-      - "10.13.13.1:21115:21115"       # NAT type test (chỉ qua VPN)
-      - "10.13.13.1:21116:21116"       # ID registration TCP (chỉ qua VPN)
-      - "10.13.13.1:21116:21116/udp"   # ID registration UDP (chỉ qua VPN)
-      - "10.13.13.1:21118:21118"       # WebSocket (chỉ qua VPN)
     volumes:
       - ./data:/root        # Lưu key, database
     restart: unless-stopped
     depends_on:
+      - wireguard
       - hbbr
-    networks:
-      - rustdesk-net
+    network_mode: "service:wireguard"
 
   # ----------------------------------------------------------
   # hbbr - RustDesk Relay Server
@@ -41,24 +35,20 @@ services:
   # Cổng: Cô lập trên giao diện VPN WireGuard 10.13.13.1
   # ----------------------------------------------------------
   hbbr:
-    container_name: hbbr
+    container_name: vynex-hbbr
     image: rustdesk/rustdesk-server:latest
     command: hbbr
-    ports:
-      # CÔ LẬP CỔNG: Chỉ cho phép relay qua mạng WireGuard VPN 10.13.13.1
-      - "10.13.13.1:21117:21117"       # Relay (chỉ qua VPN)
-      - "10.13.13.1:21119:21119"       # WebSocket relay (chỉ qua VPN)
     volumes:
       - ./data:/root
     restart: unless-stopped
-    networks:
-      - rustdesk-net
-
+    depends_on:
+      - wireguard
+    network_mode: "service:wireguard"  # <-- DÙNG CHUNG MẠNG VỚI WIREGUARD
 
  # --- WIREGUARD VPN CHO 20 NHÂN SỰ TẠI 3 TRỤ SỞ ---
   wireguard:
     image: linuxserver/wireguard:latest
-    container_name: wireguard
+    container_name: vynex-wireguard
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -66,7 +56,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Ho_Chi_Minh
-      - SERVERURL=192.168.106.1 # Endpoint IP Public / LAN Host
+      - SERVERURL=34.87.182.49 # IP Public của VPS GCP (Singapore)
       - SERVERPORT=51820
       - PEERS=20                # SINH ĐỦ 20 CẤU HÌNH & 20 PRIVATE KEYS (peer1 -> peer20, 10.13.13.2 -> 10.13.13.21)
       - PEERDNS=auto

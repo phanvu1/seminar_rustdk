@@ -12,8 +12,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _usernameController = TextEditingController(text: 'admin');
-  final _passwordController = TextEditingController(text: 'admin123');
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String _errorMessage = '';
@@ -49,11 +49,10 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _quickFill(String username, String password, UserRole role) {
+  Future<void> _quickLogin(String username, String password) async {
     _usernameController.text = username;
     _passwordController.text = password;
-    final auth = Provider.of<AuthService>(context, listen: false);
-    auth.switchRole(role);
+    await _handleLogin();
   }
 
   @override
@@ -201,19 +200,25 @@ class _LoginPageState extends State<LoginPage> {
                           label: 'Quản trị (Admin)',
                           role: UserRole.admin,
                           color: const Color(0xFF6366F1),
-                          onTap: () => _quickFill('admin', 'admin123', UserRole.admin),
+                          onTap: () => _quickLogin('admin', '123'),
                         ),
                         _buildQuickBtn(
-                          label: 'Kỹ thuật (IT Nam)',
+                          label: 'Kỹ thuật 1 (Trần Thị B)',
                           role: UserRole.it,
                           color: const Color(0xFF0EA5E9),
-                          onTap: () => _quickFill('it_nam', 'nam123', UserRole.it),
+                          onTap: () => _quickLogin('it', '123'),
                         ),
                         _buildQuickBtn(
-                          label: 'Nhân viên (Mai)',
+                          label: 'Kỹ thuật 2 (Lê Hoàng Nam)',
+                          role: UserRole.it,
+                          color: const Color(0xFF0284C7),
+                          onTap: () => _quickLogin('it2', '123'),
+                        ),
+                        _buildQuickBtn(
+                          label: 'Kế toán (Phạm Thị Mai)',
                           role: UserRole.employee,
                           color: const Color(0xFF10B981),
-                          onTap: () => _quickFill('kt_mai', 'mai123', UserRole.employee),
+                          onTap: () => _quickLogin('nhanvien', '123'),
                         ),
                       ],
                     ),

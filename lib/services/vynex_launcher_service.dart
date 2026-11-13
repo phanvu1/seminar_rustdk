@@ -39,7 +39,9 @@ class VynexLauncherService {
       final currentExeDir = File(Platform.resolvedExecutable).parent.path;
       possiblePaths.insert(0, '$currentExeDir\\vynex.exe');
       possiblePaths.insert(0, '$currentExeDir\\vynex_client\\vynex_client.exe');
+      possiblePaths.insert(0, '$currentExeDir\\..\\Client\\vynex.exe');
       possiblePaths.insert(0, '$currentExeDir\\..\\Vynex_Client\\vynex_client.exe');
+      possiblePaths.insert(0, '$currentExeDir\\..\\Vynex_Enterprise_Windows\\Client\\vynex.exe');
       possiblePaths.insert(0, '$currentExeDir\\vynex_client.exe');
       possiblePaths.insert(0, '$currentExeDir\\rustdesk.exe');
     } catch (_) {}

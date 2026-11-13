@@ -516,8 +516,8 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
             req_id_row = db.execute(text("SELECT @@IDENTITY")).fetchone()
             req_id = req_id_row[0] if req_id_row else None
             notif_query = text("""
-                INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                VALUES (2, :t, :c, 'support_request', :ref, 0, SYSDATETIME())
+                INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                VALUES (2, :t, :c, 'support_request', :ref, 0, NOW())
             """)
             db.execute(notif_query, {
                 "t": f"Yêu cầu hỗ trợ mới #{req_id or ''}: {req.title}",
@@ -547,12 +547,12 @@ def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depe
 
         # Gửi thông báo cho Nhân viên tạo ticket
         try:
-            emp_row = db.execute(text("SELECT employee_id, title FROM dbo.SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
+            emp_row = db.execute(text("SELECT employee_id, title FROM SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
             if emp_row:
                 emp_id, title = emp_row
                 db.execute(text("""
-                    INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                    VALUES (:uid, :t, :c, 'support_request', :ref, 0, SYSDATETIME())
+                    INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'support_request', :ref, 0, NOW())
                 """), {
                     "uid": emp_id,
                     "t": f"Yêu cầu #{id} đã được tiếp nhận",
@@ -606,12 +606,12 @@ def complete_support_request(id: int, db: Session = Depends(get_db)):
 
         # Gửi thông báo cho Nhân viên vào đánh giá sao
         try:
-            emp_row = db.execute(text("SELECT employee_id, title FROM dbo.SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
+            emp_row = db.execute(text("SELECT employee_id, title FROM SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
             if emp_row:
                 emp_id, title = emp_row
                 db.execute(text("""
-                    INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                    VALUES (:uid, :t, :c, 'session_ended', :ref, 0, SYSDATETIME())
+                    INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'session_ended', :ref, 0, NOW())
                 """), {
                     "uid": emp_id,
                     "t": f"Phiên hỗ trợ #{id} hoàn tất",
@@ -689,11 +689,11 @@ def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
 
         # Gửi thông báo cho IT Staff
         try:
-            dev_row = db.execute(text("SELECT device_name FROM dbo.Devices WHERE device_id = :did"), {"did": req.device_id}).fetchone()
+            dev_row = db.execute(text("SELECT device_name FROM Devices WHERE device_id = :did"), {"did": req.device_id}).fetchone()
             dname = dev_row[0] if dev_row else f"Thiết bị #{req.device_id}"
             db.execute(text("""
-                INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                VALUES (:uid, :t, :c, 'permission_granted', :ref, 0, SYSDATETIME())
+                INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                VALUES (:uid, :t, :c, 'permission_granted', :ref, 0, NOW())
             """), {
                 "uid": req.user_id,
                 "t": f"Admin đã cấp quyền máy {dname}",
@@ -713,7 +713,7 @@ def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
 def revoke_permission(id: int, db: Session = Depends(get_db)):
     """Admin chá»§ Ä‘á»™ng thu há»“i quyá»n trÆ°á»›c háº¡n"""
     try:
-        perm_row = db.execute(text("SELECT user_id, device_id FROM dbo.Permissions WHERE permission_id = :id"), {"id": id}).fetchone()
+        perm_row = db.execute(text("SELECT user_id, device_id FROM Permissions WHERE permission_id = :id"), {"id": id}).fetchone()
         
         query = text("""
             UPDATE Permissions
@@ -728,8 +728,8 @@ def revoke_permission(id: int, db: Session = Depends(get_db)):
             try:
                 uid, did = perm_row
                 db.execute(text("""
-                    INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                    VALUES (:uid, :t, :c, 'permission_revoked', :ref, 0, SYSDATETIME())
+                    INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'permission_revoked', :ref, 0, NOW())
                 """), {
                     "uid": uid,
                     "t": f"Quyền điều khiển máy #{did} đã bị thu hồi",
@@ -749,57 +749,46 @@ def revoke_permission(id: int, db: Session = Depends(get_db)):
 @app.get("/api/permissions/verify")
 @app.get("/api/permissions/verify-access")
 def check_permission(user_id: int = 0, rustdesk_id: str = "", device_id: int = 0, token: str = "", db: Session = Depends(get_db)):
-    """
-    CHá»T CHáº¶N Báº¢O Máº¬T Cá»T LÃ•I (ANTI-BYPASS GUARD - Sá»¬A Lá»–I SESSION-01 & SESSION-02):
-    - Kiá»ƒm tra thá»i gian thá»±c trÃªn CSDL: CURRENT_TIMESTAMP pháº£i náº±m trong [granted_at, expires_at]
-    - Báº¯t buá»™c: status = 1, revoked_at IS NULL, deleted_at IS NULL.
-    - Náº¿u ngÆ°á»i dÃ¹ng tá»± má»Ÿ vynex_client.exe nháº­p ID/Pass khi CHÆ¯A cÃ³ quyá»n há»£p lá»‡ trÃªn DB -> CHáº¶N Äá»¨NG NGAY!
-    """
-    # 1. XÃ¡c thá»±c qua Session Token (do Vynex Manager sinh)
-    if token and token.startswith("vynex_token_"):
-        parts = token.split("_")
-        if len(parts) >= 4:
-            return {
-                "allowed": True,
-                "reason": "XÃ¡c thá»±c thÃ nh cÃ´ng qua Vynex Session Token Ä‘Æ°á»£c cáº¥p phÃ©p",
-                "token": token,
-                "mode": "authorized_token"
-            }
+    """Kiểm tra quyền điều khiển chặt chẽ theo RBAC"""
+    # 1. Nếu là Admin (user_id = 1) -> Cho phép toàn quyền
+    if user_id == 1:
+        return {
+            "allowed": True,
+            "permission_type": "full",
+            "reason": "Admin có toàn quyền quản trị hệ thống"
+        }
 
-    # 2. XÃ¡c thá»±c trá»±c tiáº¿p trÃªn Báº£ng Permissions trong CSDL
-    try:
+    # 2. Xác định device_id nếu truyền rustdesk_id
+    target_device_id = device_id
+    if not target_device_id and rustdesk_id:
+        clean_vynex_id = rustdesk_id.replace(" ", "").strip()
+        dev_row = db.execute(text("SELECT device_id FROM Devices WHERE REPLACE(rustdesk_id, ' ', '') = :rid"), {"rid": clean_vynex_id}).fetchone()
+        if dev_row:
+            target_device_id = dev_row[0]
+
+    # 3. Tra cứu bảng Permissions xem IT user_id này có quyền hợp lệ trên thiết bị không
+    if user_id and target_device_id:
         query = text("""
-            SELECT p.permission_id, p.permission_type, p.expires_at, p.status, d.rustdesk_id, d.device_name
-            FROM Permissions p
-            JOIN Devices d ON p.device_id = d.device_id
-            WHERE (d.rustdesk_id = :rid OR p.device_id = :did)
-              AND (:uid = 0 OR p.user_id = :uid)
-              AND p.status = 1
-              AND (p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)
-              AND p.revoked_at IS NULL
-              AND p.deleted_at IS NULL
-            ORDER BY p.permission_id DESC
-            LIMIT 1
+            SELECT permission_id, permission_type, expires_at, status, revoked_at
+            FROM Permissions
+            WHERE user_id = :uid AND device_id = :did AND status = 1 AND revoked_at IS NULL
+              AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+            ORDER BY permission_id DESC LIMIT 1
         """)
-        row = db.execute(query, {"rid": rustdesk_id, "did": device_id, "uid": user_id}).fetchone()
-        if row:
+        perm_row = db.execute(query, {"uid": user_id, "did": target_device_id}).fetchone()
+        if perm_row:
             return {
                 "allowed": True,
-                "permission_id": row[0],
-                "permission_type": row[1],
-                "expires_at": str(row[2]),
-                "device_name": row[5],
-                "reason": "Quyá»n truy cáº­p 24h há»£p lá»‡ trong CSDL"
+                "permission_type": perm_row[1] or "control",
+                "reason": f"Đã được cấp quyền hợp lệ (Permission #{perm_row[0]})"
             }
-    except Exception:
-        pass
 
-    # Tá»ª CHá»I Káº¾T Ná»I (Cháº·n Ä‘á»©ng theo chÃ­nh sÃ¡ch Zero-Trust)
+    # 4. Nếu không có quyền trong DB -> Từ chối truy cập
     return {
         "allowed": False,
-        "reason": "Tá»« chá»‘i truy cáº­p: Báº¡n chÆ°a Ä‘Æ°á»£c Quáº£n trá»‹ viÃªn cáº¥p quyá»n Ä‘iá»u khiá»ƒn thiáº¿t bá»‹ nÃ y trÃªn Vynex Manager (hoáº·c quyá»n Ä‘Ã£ háº¿t háº¡n)."
+        "permission_type": None,
+        "reason": f"IT (User #{user_id}) chưa được Admin cấp quyền điều khiển thiết bị #{target_device_id or rustdesk_id}."
     }
-
 # --- NHÃ“M 7: GHI NHáº¬T KÃ PHIÃŠN (REMOTE SESSIONS) ---
 
 @app.get("/api/sessions")
@@ -887,14 +876,14 @@ def get_notifications(user_id: Optional[int] = None, role: Optional[str] = None,
         if norm_role == "admin" or (user_id == 1 and not norm_role):
             query = text("""
                 SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
-                FROM dbo.Notifications
+                FROM Notifications
                 ORDER BY notification_id DESC
             """)
             rows = db.execute(query).fetchall()
         elif norm_role in ["it", "it_staff"] or user_id == 2:
             query = text("""
                 SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
-                FROM dbo.Notifications
+                FROM Notifications
                 WHERE type IN ('support_request', 'session_started', 'session_ended')
                    OR (type IN ('permission_granted', 'permission_revoked', 'permission_request') AND (:uid = 0 OR user_id = :uid))
                    OR (:uid != 0 AND user_id = :uid)
@@ -904,7 +893,7 @@ def get_notifications(user_id: Optional[int] = None, role: Optional[str] = None,
         else:
             query = text("""
                 SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
-                FROM dbo.Notifications
+                FROM Notifications
                 WHERE user_id = :uid
                 ORDER BY notification_id DESC
             """)
@@ -928,8 +917,8 @@ def create_notification(req: NotificationCreate, db: Session = Depends(get_db)):
     """Tạo thông báo mới (IT xin cấp quyền, Nhân viên gửi ticket...)"""
     try:
         query = text("""
-            INSERT INTO dbo.Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-            VALUES (:uid, :t, :c, :type, :ref, 0, SYSDATETIME())
+            INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+            VALUES (:uid, :t, :c, :type, :ref, 0, NOW())
         """)
         db.execute(query, {
             "uid": req.user_id, "t": req.title, "c": req.content,
@@ -944,7 +933,7 @@ def create_notification(req: NotificationCreate, db: Session = Depends(get_db)):
 @app.put("/api/notifications/{id}/read")
 def mark_notification_read(id: int, db: Session = Depends(get_db)):
     try:
-        query = text("UPDATE dbo.Notifications SET is_read = 1, read_at = SYSDATETIME() WHERE notification_id = :id")
+        query = text("UPDATE Notifications SET is_read = 1, read_at = NOW() WHERE notification_id = :id")
         db.execute(query, {"id": id})
         db.commit()
         return {"message": f"Đã đánh dấu đọc thông báo #{id}"}
@@ -956,10 +945,10 @@ def mark_notification_read(id: int, db: Session = Depends(get_db)):
 def mark_all_notifications_read(user_id: Optional[int] = None, db: Session = Depends(get_db)):
     try:
         if user_id:
-            query = text("UPDATE dbo.Notifications SET is_read = 1, read_at = SYSDATETIME() WHERE user_id = :uid AND is_read = 0")
+            query = text("UPDATE Notifications SET is_read = 1, read_at = NOW() WHERE user_id = :uid AND is_read = 0")
             db.execute(query, {"uid": user_id})
         else:
-            query = text("UPDATE dbo.Notifications SET is_read = 1, read_at = SYSDATETIME() WHERE is_read = 0")
+            query = text("UPDATE Notifications SET is_read = 1, read_at = NOW() WHERE is_read = 0")
             db.execute(query)
         db.commit()
         return {"message": "Đã đánh dấu đọc toàn bộ thông báo"}

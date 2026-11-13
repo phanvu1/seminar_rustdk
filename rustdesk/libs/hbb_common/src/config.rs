@@ -77,11 +77,11 @@ lazy_static::lazy_static! {
         RwLock::new(HashMap::from([
             (
                 "custom-rendezvous-server".to_owned(),
-                "192.168.106.1:21116".to_owned(),
+                "10.13.13.1".to_owned(),
             ),
             (
                 "key".to_owned(),
-                "0LCE9qjebBXv1UWNt83ScPRlCPb6ISFHVVYPx4ulZy8=".to_owned(),
+                "NUvcbnr2VL3iLPCvmn2DjoZGMEtbQ27aEW1djMgev+M=".to_owned(),
             ),
     ]));
     pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
@@ -125,7 +125,7 @@ const CHARS: &[char] = &[
 ];
 
 pub const RENDEZVOUS_SERVERS: &[&str] = &["10.13.13.1"];
-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
+pub const RS_PUB_KEY: &str = "NUvcbnr2VL3iLPCvmn2DjoZGMEtbQ27aEW1djMgev+M=";
 
 pub const RENDEZVOUS_PORT: i32 = 21116;
 pub const RELAY_PORT: i32 = 21117;

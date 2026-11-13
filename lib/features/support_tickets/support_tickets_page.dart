@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
 import '../../models/support_request_model.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/mock_data_service.dart';
 import '../../services/permission_service.dart';
@@ -497,7 +498,17 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     final ticketService = Provider.of<SupportTicketService>(context);
     final role = auth.activeRole;
 
-    List<SupportRequestModel> list = ticketService.tickets;
+    List<SupportRequestModel> list = ticketService.tickets.where((t) {
+      if (role == UserRole.employee) {
+        return t.employeeId == auth.currentUser.userId;
+      }
+      if (role == UserRole.it) {
+        // IT chỉ thấy ticket chưa ai nhận (pending) HOẶC ticket đã được giao/nhận bởi chính IT này
+        return t.status == 'pending' || t.assignedItId == auth.currentUser.userId;
+      }
+      // Admin thấy toàn bộ ticket
+      return true;
+    }).toList();
     if (_selectedStatusFilter != 'all') {
       list = list.where((t) => t.status == _selectedStatusFilter).toList();
     }
@@ -688,24 +699,84 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                           if (ticket.status == 'pending') ...[
                             Row(
                               children: [
-                                ElevatedButton(
-                                  onPressed: () {
-                                    ticketService.acceptTicket(
-                                      ticket.requestId,
-                                      auth.currentUser.userId,
-                                      auth.currentUser.fullName,
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Đã nhận xử lý yêu cầu hỗ trợ!')),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF10B981),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                if (auth.currentUser.role == UserRole.admin) ...[
+                                  PopupMenuButton<UserModel>(
+                                    tooltip: 'Chỉ định kỹ thuật viên IT tiếp nhận xử lý',
+                                    onSelected: (itStaff) {
+                                      ticketService.acceptTicket(
+                                        ticket.requestId,
+                                        itStaff.userId,
+                                        itStaff.fullName,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Admin đã chỉ định ${itStaff.fullName} xử lý ticket #${ticket.requestId}!'),
+                                          backgroundColor: AppConstants.primaryBlue,
+                                        ),
+                                      );
+                                    },
+                                    itemBuilder: (ctx) {
+                                      final itUsers = MockDataService().users.where((u) => u.role == UserRole.it).toList();
+                                      return itUsers.map((itStaff) => PopupMenuItem(
+                                        value: itStaff,
+                                        child: Text('Chỉ định: ${itStaff.fullName}'),
+                                      )).toList();
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: AppConstants.primaryBlue,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.assignment_ind_rounded, size: 16, color: Colors.white),
+                                          SizedBox(width: 6),
+                                          Text('Chỉ Định IT Xử Lý', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  child: const Text('Chấp Nhận'),
-                                ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      ticketService.acceptTicket(
+                                        ticket.requestId,
+                                        auth.currentUser.userId,
+                                        auth.currentUser.fullName,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Admin tiếp nhận tự xử lý sự cố #${ticket.requestId}!')),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    ),
+                                    child: const Text('Admin Tự Xử Lý'),
+                                  ),
+                                ] else ...[
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      ticketService.acceptTicket(
+                                        ticket.requestId,
+                                        auth.currentUser.userId,
+                                        auth.currentUser.fullName,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Đã nhận xử lý yêu cầu hỗ trợ #${ticket.requestId}!')),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    ),
+                                    child: const Text('Tiếp Nhận Xử Lý'),
+                                  ),
+                                ],
                                 const SizedBox(width: 8),
                                 OutlinedButton(
                                   onPressed: () {
@@ -723,13 +794,14 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                             Builder(
                               builder: (context) {
                                 final permService = Provider.of<PermissionService>(context);
-                                final hasPerm = permService.hasPermission(auth.currentUser.userId, ticket.deviceId);
+                                final isAdmin = auth.currentUser.role == UserRole.admin || auth.activeRole == UserRole.admin;
+                                final hasPerm = isAdmin || permService.hasPermission(auth.currentUser.userId, ticket.deviceId);
                                 final hasRequested = permService.hasRequestedPermission(ticket.deviceId);
 
                                 return Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (!hasPerm) ...[
+                                    if (!hasPerm && !isAdmin) ...[
                                       ElevatedButton.icon(
                                         onPressed: () async {
                                           await permService.requestPermission(
@@ -758,10 +830,43 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                                       ),
                                       const SizedBox(width: 8),
                                     ],
+                                    if (isAdmin) ...[
+                                      if (ticket.assignedItId != null && !permService.hasPermission(ticket.assignedItId!, ticket.deviceId)) ...[
+                                        ElevatedButton.icon(
+                                          onPressed: () async {
+                                            await permService.grantPermission(
+                                              itUserId: ticket.assignedItId!,
+                                              itName: ticket.assignedItName ?? 'Kỹ thuật viên',
+                                              deviceId: ticket.deviceId,
+                                              deviceName: ticket.deviceName,
+                                              vynexId: ticket.vynexId,
+                                              permissionType: 'control',
+                                              durationType: '24h',
+                                              notes: 'Admin duyệt cấp quyền cho ${ticket.assignedItName} (Ticket #${ticket.requestId})',
+                                            );
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Admin đã duyệt cấp quyền 24h cho ${ticket.assignedItName}!'),
+                                                backgroundColor: const Color(0xFF10B981),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.verified_user_rounded, size: 16),
+                                          label: Text('Duyệt Quyền Cho ${ticket.assignedItName ?? "IT"}'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF6366F1),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                    ],
                                     ElevatedButton.icon(
                                       onPressed: () => _handleItConnect(context, ticket),
                                       icon: const Icon(Icons.cast_connected_rounded, size: 16),
-                                      label: Text(hasPerm ? 'Kết Nối Ngay' : 'Kết Nối'),
+                                      label: Text(isAdmin ? 'Admin Kết Nối Ngay' : (hasPerm ? 'Kết Nối Ngay' : 'Kết Nối')),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: hasPerm ? const Color(0xFF10B981) : AppConstants.primaryBlue,
                                         foregroundColor: Colors.white,

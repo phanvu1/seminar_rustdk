@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../core/constants.dart';
 import '../core/network/api_service.dart';
 import '../models/permission_model.dart';
 import '../models/notification_model.dart';
+import 'auth_service.dart';
 import 'mock_data_service.dart';
 
 class PermissionService extends ChangeNotifier {
@@ -29,6 +31,17 @@ class PermissionService extends ChangeNotifier {
 
   // Check if a specific IT user has valid active permission for a given device
   bool hasPermission(int itUserId, int deviceId) {
+    // Nếu kiểm tra cho Admin thì Admin luôn có toàn quyền
+    final auth = AuthService();
+    final targetUser = MockDataService().users.firstWhere(
+      (u) => u.userId == itUserId,
+      orElse: () => auth.currentUser,
+    );
+    if (targetUser.role == UserRole.admin) {
+      return true;
+    }
+
+    // Nếu kiểm tra cho IT Staff (ví dụ Trần Thị B user_id=2 hay Lê Hoàng Nam user_id=3)
     final list = _permissions.isNotEmpty ? _permissions : MockDataService().permissions;
     return list.any((p) =>
         p.userId == itUserId &&

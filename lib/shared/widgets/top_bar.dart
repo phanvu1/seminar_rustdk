@@ -100,48 +100,6 @@ class TopBar extends StatelessWidget {
 
           const Spacer(),
 
-          // --- ROLE SWITCHER (Demo Feature) ---
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildRoleOption(
-                  context,
-                  role: UserRole.admin,
-                  label: 'Admin',
-                  icon: Icons.admin_panel_settings_rounded,
-                  isActive: activeRole == UserRole.admin,
-                  onSelect: () => auth.switchRole(UserRole.admin),
-                ),
-                _buildRoleOption(
-                  context,
-                  role: UserRole.it,
-                  label: 'IT Staff',
-                  icon: Icons.support_agent_rounded,
-                  isActive: activeRole == UserRole.it,
-                  onSelect: () => auth.switchRole(UserRole.it),
-                ),
-                _buildRoleOption(
-                  context,
-                  role: UserRole.employee,
-                  label: 'Nhân viên',
-                  icon: Icons.badge_rounded,
-                  isActive: activeRole == UserRole.employee,
-                  onSelect: () => auth.switchRole(UserRole.employee),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-
           // Theme Toggle
           IconButton(
             onPressed: onToggleTheme,
@@ -366,6 +324,15 @@ class TopBar extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(width: 8),
+                // Nút Đăng xuất
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, size: 18, color: Color(0xFFEF4444)),
+                  tooltip: 'Đăng xuất',
+                  onPressed: () {
+                    auth.logout();
+                  },
                 ),
               ],
             ),

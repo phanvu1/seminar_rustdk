@@ -65,15 +65,14 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
 
     // 1. Xác định thiết bị của nhân viên
     DeviceModel? targetDevice;
+    final userDevices = mock.devices.where((d) => d.userId == auth.currentUser.userId).toList();
     if (_selectedDeviceId != null) {
       targetDevice = mock.devices.firstWhere(
         (d) => d.deviceId == _selectedDeviceId,
-        orElse: () => mock.devices.first,
+        orElse: () => userDevices.isNotEmpty ? userDevices.first : mock.devices.first,
       );
     } else {
-      // Tìm thiết bị gán cho nhân viên hoặc phòng ban nhân viên
-      final userDev = mock.devices.where((d) => d.userId == auth.currentUser.userId).toList();
-      targetDevice = userDev.isNotEmpty ? userDev.first : mock.devices.first;
+      targetDevice = userDevices.isNotEmpty ? userDevices.first : mock.devices.first;
     }
 
     setState(() => _isSubmitting = true);
@@ -311,11 +310,12 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
     final mock = MockDataService();
     final user = auth.currentUser;
 
-    // Lọc danh sách thiết bị phù hợp
-    final availableDevices = mock.devices;
+    // Lọc danh sách thiết bị: Chỉ hiển thị đúng thiết bị được gán cho nhân viên đang đăng nhập
+    final availableDevices = mock.devices.where((d) => d.userId == user.userId).toList();
     if (_selectedDeviceId == null && availableDevices.isNotEmpty) {
-      final myDev = availableDevices.where((d) => d.userId == user.userId).toList();
-      _selectedDeviceId = myDev.isNotEmpty ? myDev.first.deviceId : availableDevices.first.deviceId;
+      _selectedDeviceId = availableDevices.first.deviceId;
+    } else if (availableDevices.isNotEmpty && !availableDevices.any((d) => d.deviceId == _selectedDeviceId)) {
+      _selectedDeviceId = availableDevices.first.deviceId;
     }
 
     return Center(

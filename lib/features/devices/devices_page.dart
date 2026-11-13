@@ -468,13 +468,14 @@ class _DevicesPageState extends State<DevicesPage> {
                       Consumer<PermissionService>(
                         builder: (context, permService, _) {
                           final auth = Provider.of<AuthService>(context);
-                          final hasPerm = permService.hasPermission(auth.currentUser.userId, dev.deviceId);
+                          final isAdmin = auth.currentUser.role == UserRole.admin || auth.activeRole == UserRole.admin;
+                          final hasPerm = isAdmin || permService.hasPermission(auth.currentUser.userId, dev.deviceId);
                           final hasRequested = permService.hasRequestedPermission(dev.deviceId);
 
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (!hasPerm && (auth.activeRole == UserRole.it || auth.activeRole == UserRole.admin)) ...[
+                              if (!hasPerm && !isAdmin && auth.activeRole == UserRole.it) ...[
                                 ElevatedButton.icon(
                                   onPressed: () async {
                                     await permService.requestPermission(
