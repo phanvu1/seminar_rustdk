@@ -5,6 +5,7 @@ class SupportRequestModel {
   final int deviceId;
   final String deviceName;
   final String vynexId;
+  final String? clientPassword; // Mật khẩu máy Client để IT/Admin tự động kết nối
   final String title;
   final String? description;
   final String priority; // low, normal, high, urgent
@@ -24,6 +25,7 @@ class SupportRequestModel {
     required this.deviceId,
     required this.deviceName,
     required this.vynexId,
+    this.clientPassword,
     required this.title,
     this.description,
     this.priority = 'normal',
@@ -45,6 +47,7 @@ class SupportRequestModel {
       deviceId: json['device_id'] is int ? json['device_id'] : int.tryParse(json['device_id'].toString()) ?? 0,
       deviceName: json['device_name'] ?? 'Thiết bị #${json['device_id']}',
       vynexId: json['vynex_id'] ?? json['rustdesk_id'] ?? '',
+      clientPassword: json['client_password'] ?? json['password'],
       title: json['title'] ?? '',
       description: json['description'],
       priority: json['priority'] ?? 'normal',
@@ -64,6 +67,8 @@ class SupportRequestModel {
       'request_id': requestId,
       'employee_id': employeeId,
       'device_id': deviceId,
+      'vynex_id': vynexId,
+      'client_password': clientPassword,
       'title': title,
       'description': description,
       'priority': priority,
@@ -79,6 +84,7 @@ class SupportRequestModel {
     String? status,
     int? assignedItId,
     String? assignedItName,
+    String? clientPassword,
     DateTime? acceptedAt,
     DateTime? completedAt,
     int? rating,
@@ -91,6 +97,7 @@ class SupportRequestModel {
       deviceId: deviceId,
       deviceName: deviceName,
       vynexId: vynexId,
+      clientPassword: clientPassword ?? this.clientPassword,
       title: title,
       description: description,
       priority: priority,

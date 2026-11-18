@@ -18,8 +18,21 @@ class VynexLaunchResult {
 class VynexLauncherService {
   /// Tìm kiếm vị trí thực thi của Vynex Client (RustDesk)
   static String? findClientExecutable() {
+    if (Platform.isLinux) {
+      final linuxPaths = [
+        '/usr/bin/vynex',
+        '/usr/bin/rustdesk',
+        '/usr/local/bin/vynex',
+        '/usr/local/bin/rustdesk',
+      ];
+      for (final p in linuxPaths) {
+        if (File(p).existsSync()) return p;
+      }
+    }
+
     final List<String> possiblePaths = [
       // 1. Thư mục bundle client chuyên biệt trong build output
+      '${Directory.current.path}\\dist\\Vynex_Enterprise_Windows\\Client\\vynex.exe',
       '${Directory.current.path}\\build\\windows\\x64\\runner\\Release\\vynex.exe',
       '${Directory.current.path}\\build\\windows\\x64\\runner\\Release\\vynex_client\\vynex_client.exe',
       '${Directory.current.path}\\dist\\Vynex_Client\\vynex_client.exe',
@@ -54,11 +67,40 @@ class VynexLauncherService {
     return null;
   }
 
+  /// Lấy Vynex ID thực tế của máy tính này từ Vynex Client
+  static Future<String?> getLocalId() async {
+    final clientExe = findClientExecutable();
+    if (clientExe == null) return null;
+
+    try {
+      final res = await Process.run(
+        clientExe,
+        ['--get-id'],
+        workingDirectory: File(clientExe).parent.path,
+      ).timeout(const Duration(seconds: 3));
+
+      if (res.exitCode == 0 && res.stdout.toString().trim().isNotEmpty) {
+        final rawId = res.stdout.toString().trim();
+        if (rawId.length == 9) {
+          return '${rawId.substring(0, 3)} ${rawId.substring(3, 6)} ${rawId.substring(6, 9)}';
+        } else if (rawId.length == 10) {
+          return '${rawId.substring(0, 3)} ${rawId.substring(3, 6)} ${rawId.substring(6, 10)}';
+        }
+        return rawId;
+      }
+    } catch (e) {
+      debugPrint('[Vynex Launcher] getLocalId error: $e');
+    }
+    return null;
+  }
+
   /// Khởi chạy Vynex Client với các tham số ủy quyền bảo mật
   static Future<VynexLaunchResult> launchClient({
     required String vynexId,
     required String token,
     int? itUserId,
+    String? password,
+    bool isFileTransfer = false,
   }) async {
     final clientExe = findClientExecutable();
 
@@ -73,28 +115,40 @@ class VynexLauncherService {
 
     try {
       final workingDir = File(clientExe).parent.path;
+      final cleanId = vynexId.replaceAll(' ', '');
       debugPrint(
-          '[Vynex Launcher] Khởi chạy: $clientExe trong thư mục: $workingDir --connect $vynexId --token $token --it-user $itUserId');
+          '[Vynex Launcher] Khởi chạy: $clientExe trong thư mục: $workingDir --connect $cleanId (fileTransfer=$isFileTransfer)');
+
+      final actionFlag = isFileTransfer ? '--file-transfer' : '--connect';
+      final args = [
+        actionFlag,
+        cleanId,
+      ];
+
+      // Nếu có mật khẩu tự động (từ nhân viên hoặc hệ thống) -> truyền trực tiếp vào tham số CLI
+      if (password != null && password.isNotEmpty) {
+        args.addAll(['--password', password]);
+      }
+
+      args.addAll([
+        '--token',
+        token,
+        '--it-user',
+        (itUserId ?? 0).toString(),
+      ]);
 
       // Khởi chạy tiến trình Vynex Client ở chế độ Detached kèm workingDirectory để nạp đầy đủ DLL
       await Process.start(
         clientExe,
-        [
-          '--connect',
-          vynexId,
-          '--token',
-          token,
-          '--it-user',
-          (itUserId ?? 0).toString(),
-        ],
+        args,
         workingDirectory: workingDir, // BẮT BUỘC: Đảm bảo Windows nạp đúng DLL
         mode: ProcessStartMode.detached,
       );
 
+      final modeText = isFileTransfer ? 'phiên Truyền Tệp' : 'phiên Điều Khiển Màn Hình';
       return VynexLaunchResult(
         success: true,
-        message:
-            'Đã khởi chạy Vynex Client kết nối tới máy $vynexId thành công.',
+        message: 'Đã khởi chạy Vynex Client ($modeText) tới máy $cleanId thành công.',
         executablePath: clientExe,
       );
     } catch (e) {

@@ -4,6 +4,8 @@ import '../../core/constants.dart';
 import '../../core/network/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/notification_model.dart';
+import '../../services/mock_data_service.dart';
+import '../../services/permission_service.dart';
 
 class TopBar extends StatelessWidget {
   final VoidCallback onToggleSidebar;
@@ -208,9 +210,43 @@ class TopBar extends StatelessWidget {
                       )
                     else
                       ...list.take(6).map((n) {
+                        final cleanContent = n.content.replaceAll(RegExp(r'\[REQ:[^\]]+\]\s*'), '');
                         return PopupMenuItem(
-                          onTap: () {
-                            api.markNotificationAsRead(n.notificationId);
+                          onTap: () async {
+                            await api.markNotificationAsRead(n.notificationId);
+                            if (n.type == 'permission_request' && activeRole == UserRole.admin) {
+                              // Tự động duyệt quyền 24h nếu Admin bấm vào thông báo yêu cầu
+                              int itId = 2;
+                              int devId = 1;
+                              final match = RegExp(r'\[REQ:it_id=(\d+),dev_id=(\d+)\]').firstMatch(n.content);
+                              if (match != null) {
+                                itId = int.tryParse(match.group(1)!) ?? 2;
+                                devId = int.tryParse(match.group(2)!) ?? 1;
+                              } else {
+                                if (n.content.contains('Lê Hoàng Nam') || n.title.contains('Lê Hoàng Nam')) itId = 3;
+                                if (n.referenceId != null && n.referenceId! > 0) devId = n.referenceId!;
+                              }
+                              final mock = MockDataService();
+                              final itUser = mock.users.firstWhere((u) => u.userId == itId, orElse: () => mock.users[1]);
+                              final device = mock.devices.firstWhere((d) => d.deviceId == devId, orElse: () => mock.devices.first);
+                              final permService = Provider.of<PermissionService>(context, listen: false);
+                              await permService.grantPermission(
+                                itUserId: itUser.userId,
+                                itName: itUser.fullName,
+                                deviceId: device.deviceId,
+                                deviceName: device.name,
+                                vynexId: device.vynexId,
+                                permissionType: 'control',
+                                durationType: '24h',
+                                notes: 'Admin duyệt nhanh qua thông báo cho ${itUser.fullName}',
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã duyệt cấp quyền 24h cho ${itUser.fullName} thành công!'),
+                                  backgroundColor: const Color(0xFF10B981),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             width: 320,
@@ -258,7 +294,7 @@ class TopBar extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        n.content,
+                                        cleanContent,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
@@ -342,43 +378,4 @@ class TopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildRoleOption(
-    BuildContext context, {
-    required UserRole role,
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onSelect,
-  }) {
-    return InkWell(
-      onTap: onSelect,
-      borderRadius: BorderRadius.circular(7),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? AppConstants.primaryBlue : Colors.transparent,
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isActive ? Colors.white : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                color: isActive ? Colors.white : const Color(0xFF94A3B8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

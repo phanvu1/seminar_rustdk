@@ -301,6 +301,20 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> completeSupportRequest(int requestId) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/complete');
+      final res = await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] completeSupportRequest fallback: $e');
+    }
+    return true;
+  }
+
   Future<bool> rateSupportRequest(int requestId, int rating, String feedback) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/rate');

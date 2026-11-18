@@ -540,7 +540,7 @@ class _DevicesPageState extends State<DevicesPage> {
                                               onPressed: () => Navigator.pop(c),
                                               child: const Text('Đóng'),
                                             ),
-                                            OutlinedButton.icon(
+                                            ElevatedButton.icon(
                                               onPressed: () async {
                                                 await permService.requestPermission(
                                                   itUserId: auth.currentUser.userId,
@@ -561,23 +561,10 @@ class _DevicesPageState extends State<DevicesPage> {
                                               },
                                               icon: const Icon(Icons.send_rounded, size: 14),
                                               label: const Text('Gửi yêu cầu tới Admin'),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () async {
-                                                await permService.grantPermission(
-                                                  itUserId: auth.currentUser.userId,
-                                                  itName: auth.currentUser.fullName,
-                                                  deviceId: dev.deviceId,
-                                                  deviceName: dev.name,
-                                                  vynexId: dev.vynexId,
-                                                  permissionType: 'control',
-                                                  durationType: '24h',
-                                                );
-                                                if (!mounted) return;
-                                                Navigator.pop(c);
-                                              },
-                                              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
-                                              child: const Text('[Demo] Cấp Quyền 24h'),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppConstants.primaryBlue,
+                                                foregroundColor: Colors.white,
+                                              ),
                                             ),
                                           ],
                                         );

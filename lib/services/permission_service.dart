@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../core/constants.dart';
@@ -13,18 +14,51 @@ class PermissionService extends ChangeNotifier {
   PermissionService._internal();
 
   List<PermissionModel> _permissions = [];
-  final Set<int> _pendingRequestedDeviceIds = {};
+  List<NotificationModel> _pendingRequests = [];
+  final Set<String> _pendingTicketRequests = {};
   bool _isLoading = false;
+  Timer? _pollingTimer;
 
   List<PermissionModel> get permissions => _permissions;
+  List<NotificationModel> get pendingRequests => _pendingRequests;
   bool get isLoading => _isLoading;
 
-  bool hasRequestedPermission(int deviceId) => _pendingRequestedDeviceIds.contains(deviceId);
+  void startPolling() {
+    if (_pollingTimer != null && _pollingTimer!.isActive) return;
+    fetchPermissions();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      silentFetchPermissions();
+    });
+  }
+
+  void stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  Future<void> silentFetchPermissions() async {
+    final newPerms = await ApiService().getPermissions();
+    _permissions = newPerms;
+    await fetchPendingRequests();
+    notifyListeners();
+  }
+
+  Future<void> fetchPendingRequests() async {
+    try {
+      final notifs = await ApiService().getNotifications(userId: 1, role: UserRole.admin);
+      _pendingRequests = notifs.where((n) => n.type == 'permission_request' && !n.isRead).toList();
+    } catch (_) {}
+  }
+
+  bool hasRequestedTicket(int requestId) => _pendingTicketRequests.contains('req_$requestId');
+
+  bool hasRequestedPermission(int deviceId) => _pendingTicketRequests.contains('dev_$deviceId');
 
   Future<void> fetchPermissions() async {
     _isLoading = true;
     notifyListeners();
     _permissions = await ApiService().getPermissions();
+    await fetchPendingRequests();
     _isLoading = false;
     notifyListeners();
   }
@@ -47,6 +81,18 @@ class PermissionService extends ChangeNotifier {
         p.userId == itUserId &&
         p.deviceId == deviceId &&
         p.isValid);
+  }
+
+  /// Lấy bản ghi quyền hợp lệ hiện tại của một IT với một thiết bị (nếu có)
+  PermissionModel? getActivePermissionFor(int itUserId, int deviceId) {
+    final list = _permissions.isNotEmpty ? _permissions : MockDataService().permissions;
+    try {
+      return list.firstWhere(
+        (p) => p.userId == itUserId && p.deviceId == deviceId && p.isValid,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Sinh Session Token ủy quyền phiên kết nối từ Vynex Manager sang Vynex Client
@@ -116,6 +162,7 @@ class PermissionService extends ChangeNotifier {
       permissionType: permissionType,
       grantedAt: now,
       expiresAt: expiresAt,
+      durationHours: durationType == '24h' ? 24 : (durationType == '7d' ? 168 : null),
       notes: notes ?? 'Được cấp bởi Admin ($durationType)',
       status: true,
     );
@@ -132,18 +179,22 @@ class PermissionService extends ChangeNotifier {
     required int deviceId,
     required String deviceName,
     required String vynexId,
+    int? requestId,
     String? reason,
   }) async {
-    _pendingRequestedDeviceIds.add(deviceId);
+    if (requestId != null) {
+      _pendingTicketRequests.add('req_$requestId');
+    }
+    _pendingTicketRequests.add('dev_$deviceId');
     notifyListeners();
 
     final notif = NotificationModel(
       notificationId: DateTime.now().millisecondsSinceEpoch % 100000,
       userId: 1, // Gửi tới Admin
-      title: 'IT $itName yêu cầu cấp quyền điều khiển máy $deviceName',
-      content: 'IT $itName yêu cầu cấp quyền điều khiển máy $deviceName (ID: $vynexId). Lý do: ${reason ?? "Hỗ trợ xử lý sự cố kỹ thuật"}',
+      title: 'IT $itName yêu cầu cấp quyền máy $deviceName',
+      content: '[REQ:it_id=$itUserId,dev_id=$deviceId] IT $itName yêu cầu cấp quyền điều khiển máy $deviceName (ID: $vynexId)${requestId != null && requestId > 0 ? " cho Ticket #$requestId" : ""}. Lý do: ${reason ?? "Hỗ trợ xử lý sự cố kỹ thuật"}',
       type: 'permission_request',
-      referenceId: deviceId,
+      referenceId: requestId != null && requestId > 0 ? requestId : deviceId,
       isRead: false,
       createdAt: DateTime.now(),
     );

@@ -59,11 +59,11 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<bool> login(String username, String password) async {
-    // Kiểm tra mật khẩu chuẩn: '123' cho tất cả tài khoản demo
     final u = username.trim().toLowerCase();
     final p = password.trim();
 
-    if (p != '123') {
+    // Mật khẩu hệ thống chấp nhận 123 hoặc 123456
+    if (p != '123' && p != '123456') {
       return false;
     }
 
@@ -76,14 +76,14 @@ class AuthService extends ChangeNotifier {
     } catch (_) {}
 
     // Khớp tài khoản theo đúng 4 Actor nghiệp vụ (admin, it, it2, nhanvien)
-    UserModel? matchedUser;
-    if (u == 'admin') {
+    final UserModel matchedUser;
+    if (u == 'admin' || u == 'quantri') {
       matchedUser = MockDataService().users.firstWhere((usr) => usr.username == 'admin');
-    } else if (u == 'it' || u == 'it1') {
+    } else if (u == 'it' || u == 'it1' || u == 'it_support' || u == 'tranthib') {
       matchedUser = MockDataService().users.firstWhere((usr) => usr.username == 'it');
-    } else if (u == 'it2' || u == 'it_nam' || u == 'nam') {
+    } else if (u == 'it2' || u == 'it_nam' || u == 'nam' || u == 'lehoangnam') {
       matchedUser = MockDataService().users.firstWhere((usr) => usr.username == 'it2');
-    } else if (u == 'nhanvien' || u == 'ketoan' || u == 'mai') {
+    } else if (u == 'nhanvien' || u == 'ketoan' || u == 'mai' || u == 'kt_mai' || u == 'phamthimai') {
       matchedUser = MockDataService().users.firstWhere((usr) => usr.role == UserRole.employee);
     } else {
       matchedUser = MockDataService().users.firstWhere(
@@ -92,14 +92,11 @@ class AuthService extends ChangeNotifier {
           );
     }
 
-    if (matchedUser != null) {
-      _currentUser = matchedUser;
-      _activeRole = matchedUser.role;
-      _isAuthenticated = true;
-      notifyListeners();
-      return true;
-    }
-    return false;
+    _currentUser = matchedUser;
+    _activeRole = matchedUser.role;
+    _isAuthenticated = true;
+    notifyListeners();
+    return true;
   }
 
   void logout() {

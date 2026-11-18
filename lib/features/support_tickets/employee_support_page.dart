@@ -26,6 +26,7 @@ class EmployeeSupportPage extends StatefulWidget {
 class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _clientPasswordController = TextEditingController();
   int? _selectedDeviceId;
   String _selectedPriority = 'normal';
   bool _isSubmitting = false;
@@ -35,7 +36,7 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<SupportTicketService>(context, listen: false).fetchTickets();
+      Provider.of<SupportTicketService>(context, listen: false).startPolling();
     });
   }
 
@@ -43,6 +44,7 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _clientPasswordController.dispose();
     super.dispose();
   }
 
@@ -53,6 +55,17 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng nhập tiêu đề sự cố cần hỗ trợ!'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    final clientPass = _clientPasswordController.text.trim();
+    if (clientPass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bắt buộc: Vui lòng nhập mật khẩu Vynex Client (RustDesk) trên máy của bạn!'),
           backgroundColor: Color(0xFFEF4444),
         ),
       );
@@ -85,6 +98,9 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
         deviceId: targetDevice.deviceId,
         deviceName: targetDevice.name,
         vynexId: targetDevice.vynexId,
+        clientPassword: _clientPasswordController.text.trim().isNotEmpty
+            ? _clientPasswordController.text.trim()
+            : null,
         title: title,
         description: _descController.text.trim(),
         priority: _selectedPriority,
@@ -97,6 +113,7 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
       // 3. Reset form
       _titleController.clear();
       _descController.clear();
+      _clientPasswordController.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -282,17 +299,38 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  widget.onSwitchView(isCreateMode ? 'employee_my_tickets' : 'employee_create_ticket');
-                },
-                icon: Icon(isCreateMode ? Icons.history_rounded : Icons.add_circle_outline_rounded, size: 18),
-                label: Text(isCreateMode ? 'Xem Lịch Sử Của Tôi' : 'Tạo Yêu Cầu Mới'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.primaryBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
+              Row(
+                children: [
+                  if (!isCreateMode) ...[
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await Provider.of<SupportTicketService>(context, listen: false).fetchTickets();
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã cập nhật trạng thái yêu cầu mới nhất!'), duration: Duration(seconds: 1)),
+                        );
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Làm Mới'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      widget.onSwitchView(isCreateMode ? 'employee_my_tickets' : 'employee_create_ticket');
+                    },
+                    icon: Icon(isCreateMode ? Icons.history_rounded : Icons.add_circle_outline_rounded, size: 18),
+                    label: Text(isCreateMode ? 'Xem Lịch Sử Của Tôi' : 'Tạo Yêu Cầu Mới'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -405,6 +443,30 @@ class _EmployeeSupportPageState extends State<EmployeeSupportPage> {
               onChanged: (v) {
                 if (v != null) setState(() => _selectedDeviceId = v);
               },
+            ),
+            const SizedBox(height: 18),
+
+            // Mật khẩu kết nối Client (Bắt buộc để IT/Admin tự động đăng nhập)
+            const Row(
+              children: [
+                Text('Mật khẩu kết nối máy tính (Bắt buộc):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                SizedBox(width: 4),
+                Text('*', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Bắt buộc nhập mật khẩu RustDesk trên máy tính của bạn để IT/Admin có thể tự động kết nối mà không cần hỏi lại bạn.',
+              style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _clientPasswordController,
+              decoration: const InputDecoration(
+                hintText: 'Nhập mật khẩu một lần hoặc mật khẩu cố định của RustDesk máy này...',
+                prefixIcon: Icon(Icons.vpn_key_rounded, size: 20, color: Color(0xFFE11D48)),
+                isDense: true,
+              ),
             ),
             const SizedBox(height: 18),
 

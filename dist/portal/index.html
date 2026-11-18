@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vynex Enterprise - Cổng Tải Phần Mềm Điều Khiển Từ Xa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563EB;
+      --primary-hover: #1D4ED8;
+      --accent: #10B981;
+      --bg: #0F172A;
+      --card-bg: #1E293B;
+      --card-border: #334155;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .container {
+      max-width: 1050px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 50px 0 35px;
+    }
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(37, 99, 235, 0.3);
+      color: #60A5FA;
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 16px;
+      background: linear-gradient(180deg, #FFFFFF 0%, #94A3B8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 16px;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    /* Download Grid: Exactly 2 Operating Systems */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 28px;
+      margin: 36px 0;
+    }
+    @media (max-width: 768px) {
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .download-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 36px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .download-card:hover {
+      transform: translateY(-4px);
+      border-color: #3B82F6;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    }
+    .download-card.windows {
+      border-color: rgba(37, 99, 235, 0.5);
+    }
+    .download-card.linux {
+      border-color: rgba(234, 88, 12, 0.5);
+    }
+    .card-badge {
+      position: absolute;
+      top: -12px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card-badge.blue {
+      background: #2563EB;
+    }
+    .card-badge.orange {
+      background: #EA580C;
+    }
+    .os-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 18px;
+    }
+    .os-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .os-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      min-height: 40px;
+    }
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      transition: background 0.2s;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+      cursor: pointer;
+      border: none;
+    }
+    .btn-download:hover {
+      background: var(--primary-hover);
+    }
+    .btn-linux {
+      background: #EA580C;
+      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.3);
+    }
+    .btn-linux:hover {
+      background: #C2410C;
+    }
+    .btn-outline {
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #E2E8F0;
+      box-shadow: none;
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .meta-info {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    /* Comparison / Instructions */
+    .instructions {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 30px;
+      margin: 10px 0 50px;
+    }
+    .instructions h3 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .platform-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 768px) {
+      .platform-tabs {
+        grid-template-columns: 1fr;
+      }
+    }
+    .guide-box {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .guide-box h4 {
+      font-size: 15px;
+      margin-bottom: 12px;
+      color: #60A5FA;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .guide-box.linux-guide h4 {
+      color: #FB923C;
+    }
+    .guide-step {
+      font-size: 13px;
+      margin-bottom: 10px;
+      color: #CBD5E1;
+      display: flex;
+      gap: 8px;
+    }
+    .guide-step span {
+      font-weight: bold;
+      color: #94A3B8;
+    }
+    code {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 3px 8px;
+      border-radius: 5px;
+      color: #38BDF8;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    /* Footer */
+    footer {
+      margin-top: auto;
+      padding: 24px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container nav">
+      <a href="#" class="logo">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">VYNEX ENTERPRISE</div>
+      </a>
+      <div class="badge">
+        <span>●</span> Hệ thống Đám mây Trực tuyến (GCP)
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="hero-pill">
+        🛡️ Phân Quyền RBAC • Mã Hóa P2P • VPN WireGuard Cô Lập
+      </div>
+      <h1>Cổng Tải Phần Mềm Điều Khiển Từ Xa</h1>
+      <p>Hệ thống hỗ trợ kỹ thuật và giám sát máy tính doanh nghiệp tập trung. Tải và cài đặt trực tiếp cho hai nền tảng trọng tâm: Windows và Ubuntu Linux.</p>
+    </section>
+
+    <!-- Download Grid for Windows & Ubuntu Linux -->
+    <section class="cards-grid">
+      <!-- Windows Card -->
+      <div class="download-card windows">
+        <div class="card-badge blue">Máy Quản Trị / Kỹ Thuật (Host)</div>
+        <div class="os-icon">🪟</div>
+        <h2 class="os-title">Windows 64-bit</h2>
+        <div class="os-sub">Trọn bộ Vynex Client Engine & Management Dashboard điều hành</div>
+        <a href="https://github.com/phanvu1/seminar_rustdk/releases/download/v2.0.0/Vynex_Enterprise_Windows_v2.0.zip" class="btn-download" target="_blank">
+          <span>⬇</span> Tải Vynex cho Windows (.zip)
+        </a>
+        <div class="meta-info">Phiên bản v2.0 Enterprise • 66.3 MB • Win 10/11</div>
+      </div>
+
+      <!-- Linux / Ubuntu Card -->
+      <div class="download-card linux">
+        <div class="card-badge orange">Máy Nhân Viên / Máy Ảo</div>
+        <div class="os-icon">🐧</div>
+        <h2 class="os-title">Ubuntu Linux 64-bit</h2>
+        <div class="os-sub">Gói thiết lập tự động Vynex Client & WireGuard kết nối VPS</div>
+        <a href="https://github.com/phanvu1/seminar_rustdk/releases/download/v2.0.0/Vynex_Enterprise_Linux_v2.0.tar.gz" class="btn-download btn-linux" target="_blank">
+          <span>⬇</span> Tải Gói Cài Đặt Linux (.tar.gz)
+        </a>
+        <button onclick="copyLinuxCmd(event)" class="btn-download btn-outline">
+          <span id="btn-copy-icon">📋</span> <span id="btn-copy-text">Copy Lệnh Terminal 1 Chạm</span>
+        </button>
+        <div class="meta-info" id="linux-tip">Tương thích Ubuntu 20.04 / 22.04 / 24.04 LTS</div>
+      </div>
+    </section>
+
+    <!-- Detailed Installation Guide -->
+    <section class="instructions">
+      <h3>📖 Hướng Dẫn Cài Đặt Cho Từng Máy</h3>
+      <div class="platform-tabs">
+        <!-- Windows Guide -->
+        <div class="guide-box">
+          <h4>🪟 Thiết lập trên Windows</h4>
+          <div class="guide-step">
+            <span>1.</span> Tải file <code>Vynex_Enterprise_Windows_v2.0.zip</code> và giải nén.
+          </div>
+          <div class="guide-step">
+            <span>2.</span> Chạy file <code>run_vynex.bat</code> để kích hoạt Client và Dashboard.
+          </div>
+          <div class="guide-step">
+            <span>3.</span> Đăng nhập: <code>admin</code> (Quản trị) hoặc <code>it</code> (Kỹ thuật), pass: <code>123</code>.
+          </div>
+        </div>
+
+        <!-- Ubuntu Guide -->
+        <div class="guide-box linux-guide">
+          <h4>🐧 Thiết lập trên Ubuntu (Máy ảo)</h4>
+          <div class="guide-step">
+            <span>1.</span> Mở Terminal máy ảo Ubuntu (phím tắt <code>Ctrl + Alt + T</code>).
+          </div>
+          <div class="guide-step">
+            <span>2.</span> Bấm nút <b>Copy Lệnh Terminal</b> ở trên và dán (Paste) vào Terminal.
+          </div>
+          <div class="guide-step">
+            <span>3.</span> Ứng dụng tự động kết nối API 10.13.13.1 và khởi chạy giao diện Nhân viên.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      Đồ án Seminar / Khóa luận tốt nghiệp - Hệ thống Vynex Enterprise Remote Desktop © 2026.
+    </div>
+  </footer>
+
+  <script>
+    function copyLinuxCmd(e) {
+      e.preventDefault();
+      const cmd = "cd ~/vynex_manager && curl -f -s http://10.13.13.1:8000/api/update/lib.tar.gz | tar -xzf - && flutter run -d linux";
+      navigator.clipboard.writeText(cmd).then(() => {
+        const text = document.getElementById('btn-copy-text');
+        const icon = document.getElementById('btn-copy-icon');
+        text.innerText = "Đã Copy Lệnh Thành Công!";
+        icon.innerText = "✓";
+        setTimeout(() => {
+          text.innerText = "Copy Lệnh Terminal 1 Chạm";
+          icon.innerText = "📋";
+        }, 3000);
+      });
+    }
+  </script>
+</body>
+</html>

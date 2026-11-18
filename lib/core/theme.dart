@@ -4,7 +4,13 @@ import 'constants.dart';
 class AppTheme {
   static const String defaultFont = 'Segoe UI';
   static const List<String> fontFallbacks = [
-    'Roboto',
+    'Segoe UI',
+    'Ubuntu',
+    'Noto Sans',
+    'DejaVu Sans',
+    'Liberation Sans',
+    'Calibri',
+    'Tahoma',
     'Arial',
     'sans-serif',
   ];

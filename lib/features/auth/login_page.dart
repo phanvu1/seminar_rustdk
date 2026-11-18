@@ -44,15 +44,9 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!success) {
       setState(() {
-        _errorMessage = 'Tên đăng nhập hoặc mật khẩu không chính xác.';
+        _errorMessage = 'Tên đăng nhập hoặc mật khẩu không chính xác.\nMật khẩu mặc định hệ thống: 123 (hoặc 123456)\nTài khoản: admin (Admin), it / it2 (Kỹ thuật), nhanvien (Nhân viên)';
       });
     }
-  }
-
-  Future<void> _quickLogin(String username, String password) async {
-    _usernameController.text = username;
-    _passwordController.text = password;
-    await _handleLogin();
   }
 
   @override
@@ -104,7 +98,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         child: Text(
                           _errorMessage,
-                          style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13),
+                          style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, height: 1.4),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -119,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                     TextField(
                       controller: _usernameController,
                       decoration: const InputDecoration(
-                        hintText: 'Nhập username (ví dụ: admin, it_nam, kt_mai)',
+                        hintText: 'Nhập username (admin / it / it2 / nhanvien)',
                         prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                       ),
                     ),
@@ -135,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        hintText: 'Nhập mật khẩu',
+                        hintText: 'Nhập mật khẩu (mặc định: 123)',
                         prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -173,55 +167,6 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    const SizedBox(height: 12),
-
-                    // Quick Switch Demo Buttons
-                    const Text(
-                      'TÀI KHOẢN MẪU DÀNH CHO DEMO:',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF94A3B8),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        _buildQuickBtn(
-                          label: 'Quản trị (Admin)',
-                          role: UserRole.admin,
-                          color: const Color(0xFF6366F1),
-                          onTap: () => _quickLogin('admin', '123'),
-                        ),
-                        _buildQuickBtn(
-                          label: 'Kỹ thuật 1 (Trần Thị B)',
-                          role: UserRole.it,
-                          color: const Color(0xFF0EA5E9),
-                          onTap: () => _quickLogin('it', '123'),
-                        ),
-                        _buildQuickBtn(
-                          label: 'Kỹ thuật 2 (Lê Hoàng Nam)',
-                          role: UserRole.it,
-                          color: const Color(0xFF0284C7),
-                          onTap: () => _quickLogin('it2', '123'),
-                        ),
-                        _buildQuickBtn(
-                          label: 'Kế toán (Phạm Thị Mai)',
-                          role: UserRole.employee,
-                          color: const Color(0xFF10B981),
-                          onTap: () => _quickLogin('nhanvien', '123'),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -229,24 +174,6 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildQuickBtn({
-    required String label,
-    required UserRole role,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: color.withOpacity(0.5)),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
     );
   }
 }

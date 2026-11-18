@@ -9,6 +9,7 @@ class PermissionModel {
   final DateTime grantedAt;
   final DateTime? expiresAt; // null means 'forever' / Vĩnh viễn
   final DateTime? revokedAt;
+  final int? durationHours;
   final String? notes;
   final bool status; // 1 = active, 0 = revoked/expired
 
@@ -22,6 +23,7 @@ class PermissionModel {
     required this.permissionType,
     required this.grantedAt,
     this.expiresAt,
+    this.durationHours,
     this.revokedAt,
     this.notes,
     this.status = true,
@@ -63,6 +65,7 @@ class PermissionModel {
       'user_id': userId,
       'device_id': deviceId,
       'permission_type': permissionType,
+      'duration_hours': durationHours ?? (expiresAt != null ? expiresAt!.difference(grantedAt).inHours : 24),
       'granted_at': grantedAt.toIso8601String(),
       'expires_at': expiresAt?.toIso8601String(),
       'revoked_at': revokedAt?.toIso8601String(),

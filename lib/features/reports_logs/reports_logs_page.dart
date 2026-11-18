@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants.dart';
+import '../../core/network/api_service.dart';
+import '../../models/remote_session_model.dart';
 import '../../services/mock_data_service.dart';
 
 class ReportsLogsPage extends StatefulWidget {
@@ -15,11 +17,34 @@ class ReportsLogsPage extends StatefulWidget {
 
 class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  List<RemoteSessionModel> _sessions = [];
+  bool _isLoadingSessions = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadSessions();
+  }
+
+  Future<void> _loadSessions() async {
+    setState(() => _isLoadingSessions = true);
+    try {
+      final list = await ApiService().getSessions();
+      if (mounted) {
+        setState(() {
+          _sessions = list;
+          _isLoadingSessions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _sessions = MockDataService().sessions;
+          _isLoadingSessions = false;
+        });
+      }
+    }
   }
 
   @override
@@ -51,6 +76,7 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
 
     final filePath = '$targetDir\\$fileName';
     final mock = MockDataService();
+    final sessionList = _sessions.isNotEmpty ? _sessions : mock.sessions;
 
     try {
       final file = File(filePath);
@@ -73,11 +99,11 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
         streamContent.writeln('0 -30 Td');
         streamContent.writeln('(Generated: $displayDate) Tj');
         streamContent.writeln('0 -20 Td');
-        streamContent.writeln('(Total Devices: ${mock.devices.length} | Active Sessions: ${mock.sessions.length}) Tj');
+        streamContent.writeln('(Total Devices: ${mock.devices.length} | Active Sessions: ${sessionList.length}) Tj');
         streamContent.writeln('0 -30 Td');
         streamContent.writeln('(--- RECENT REMOTE SESSIONS LOG ---) Tj');
 
-        for (var s in mock.sessions.take(10)) {
+        for (var s in sessionList.take(10)) {
           streamContent.writeln('0 -18 Td');
           streamContent.writeln('(Session #${s.sessionId} | ${s.deviceName} | IT: ${s.itUserName} | Duration: ${s.durationFormatted}) Tj');
         }
@@ -104,7 +130,7 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
         final csv = StringBuffer();
         csv.write('\uFEFF'); // UTF-8 BOM
         csv.writeln('Mã Phiên,Tên Thiết Bị,Vynex ID,Kỹ Thuật Viên IT,Người Dùng,Loại Kết Nối,Bắt Đầu,Thời Lượng,Đánh Giá,Trạng Thái,Ghi Chú');
-        for (var s in mock.sessions) {
+        for (var s in sessionList) {
           final start = DateFormat('dd/MM/yyyy HH:mm:ss').format(s.startTime);
           csv.writeln('${s.sessionId},"${s.deviceName}","${s.vynexId}","${s.itUserName}","${s.targetUserName}","${s.connectionType}","$start","${s.durationFormatted}",${s.qualityScore ?? 5},"${s.status}","${s.notes ?? ''}"');
         }
@@ -572,63 +598,163 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
   }
 
   Widget _buildSessionsTab(BuildContext context, bool isDark) {
-    final mock = MockDataService();
+    final displayList = _sessions.isNotEmpty ? _sessions : MockDataService().sessions;
     return Card(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: mock.sessions.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final s = mock.sessions[index];
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppConstants.primaryBlue.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.cable_rounded, color: AppConstants.primaryBlue, size: 20),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Phiên #${s.sessionId}: ${s.itName} ➔ ${s.targetName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('Thiết bị: ${s.deviceName} (${s.vynexId}) • Kết nối: ${s.connectionType.toUpperCase()}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text('Ghi chú: ${s.notes ?? "Không có"}', style: const TextStyle(fontSize: 12)),
-                ),
-                Text('Thời lượng: ${(s.durationSeconds ?? 0) ~/ 60}m', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(width: 16),
                 Row(
-                  children: List.generate(
-                    5,
-                    (st) => Icon(
-                      Icons.star_rounded,
-                      size: 14,
-                      color: st < (s.qualityScore ?? 5) ? const Color(0xFFFBBF24) : const Color(0xFFCBD5E1),
+                  children: [
+                    const Icon(Icons.history_edu_rounded, size: 20, color: AppConstants.primaryBlue),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Lịch Sử Các Phiên Kết Nối Remote (${displayList.length})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
-                  ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: _loadSessions,
+                  icon: _isLoadingSessions
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Làm Mới'),
                 ),
               ],
             ),
-          );
-        },
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            if (_isLoadingSessions && _sessions.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (displayList.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: Text('Chưa có phiên kết nối nào được ghi nhận.')),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: displayList.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final s = displayList[index];
+                  final isStarted = s.status == 'started';
+                  final durationText = s.durationSeconds != null
+                      ? '${s.durationSeconds! ~/ 60}m ${s.durationSeconds! % 60}s'
+                      : (isStarted ? 'Đang chạy' : '0s');
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isStarted
+                                ? const Color(0xFF10B981).withOpacity(0.12)
+                                : AppConstants.primaryBlue.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isStarted ? Icons.sensors_rounded : Icons.cable_rounded,
+                            color: isStarted ? const Color(0xFF10B981) : AppConstants.primaryBlue,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Phiên #${s.sessionId}: ${s.itName} ➔ ${s.targetName}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isStarted
+                                          ? const Color(0xFF10B981).withOpacity(0.15)
+                                          : const Color(0xFF64748B).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isStarted ? 'ĐANG KẾT NỐI' : 'HOÀN TẤT',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isStarted ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Thiết bị: ${s.deviceName} (${s.vynexId}) • Kết nối: ${s.connectionType.toUpperCase()} • Bắt đầu: ${DateFormat('dd/MM HH:mm:ss').format(s.startedAt)}',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Ghi chú: ${s.notes ?? (s.requestId > 0 ? "Ticket #${s.requestId}" : "Kết nối trực tiếp")}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Thời lượng: $durationText',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: isStarted ? const Color(0xFF10B981) : null,
+                              ),
+                            ),
+                            if (s.qualityScore != null)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(
+                                  5,
+                                  (st) => Icon(
+                                    Icons.star_rounded,
+                                    size: 13,
+                                    color: st < s.qualityScore! ? const Color(0xFFFBBF24) : const Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

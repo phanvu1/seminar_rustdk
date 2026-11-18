@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/network/api_service.dart';
 import '../models/support_request_model.dart';
@@ -11,9 +12,31 @@ class SupportTicketService extends ChangeNotifier {
 
   List<SupportRequestModel> _tickets = [];
   bool _isLoading = false;
+  Timer? _pollingTimer;
 
   List<SupportRequestModel> get tickets => _tickets;
   bool get isLoading => _isLoading;
+
+  void startPolling() {
+    if (_pollingTimer != null && _pollingTimer!.isActive) return;
+    fetchTickets();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      silentFetchTickets();
+    });
+  }
+
+  void stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  Future<void> silentFetchTickets() async {
+    final newTickets = await ApiService().getSupportRequests();
+    if (newTickets.isNotEmpty) {
+      _tickets = newTickets;
+      notifyListeners();
+    }
+  }
 
   Future<void> fetchTickets() async {
     _isLoading = true;
@@ -31,8 +54,11 @@ class SupportTicketService extends ChangeNotifier {
     required String deviceName,
     required String vynexId,
     required String title,
+    String? clientPassword,
     String? description,
     String priority = 'normal',
+    int? assignedItId,
+    String? assignedItName,
   }) async {
     final existingIds = MockDataService().supportRequests.map((e) => e.requestId).toSet();
     int newId = 101;
@@ -47,10 +73,14 @@ class SupportTicketService extends ChangeNotifier {
       deviceId: deviceId,
       deviceName: deviceName,
       vynexId: vynexId,
+      clientPassword: clientPassword,
       title: title,
       description: description,
       priority: priority,
-      status: 'pending',
+      status: assignedItId != null ? 'accepted' : 'pending',
+      assignedItId: assignedItId,
+      assignedItName: assignedItName,
+      acceptedAt: assignedItId != null ? DateTime.now() : null,
       createdAt: DateTime.now(),
     );
 
@@ -58,6 +88,25 @@ class SupportTicketService extends ChangeNotifier {
     final success = await ApiService().createSupportRequest(ticket);
     await fetchTickets();
     return success;
+  }
+
+  // Complete ticket directly
+  Future<bool> completeTicket(int requestId) async {
+    final idx = _tickets.indexWhere((t) => t.requestId == requestId);
+    if (idx != -1) {
+      _tickets[idx] = _tickets[idx].copyWith(
+        status: 'completed',
+        completedAt: DateTime.now(),
+      );
+      final mockIdx = MockDataService().supportRequests.indexWhere((t) => t.requestId == requestId);
+      if (mockIdx != -1) {
+        MockDataService().supportRequests[mockIdx] = _tickets[idx];
+      }
+      notifyListeners();
+      await ApiService().completeSupportRequest(requestId);
+      return true;
+    }
+    return false;
   }
 
   // Employee cancels pending ticket (Lỗi 2.4 & 2.5)

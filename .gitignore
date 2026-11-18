@@ -28,4 +28,11 @@ vpn_configs/
 manager_src_build/
 server/wireguard-config/**/privatekey-*
 server/wireguard-config/**/presharedkey-*
+server/wireguard-config/peer[2-9]/
+server/wireguard-config/peer[1-9][0-9]/
 server/.env
+
+# Archives & Temporary files
+*.zip
+*.tar.gz
+scratch/

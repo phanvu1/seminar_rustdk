@@ -1,13 +1,10 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/permission_service.dart';
 import '../../services/mock_data_service.dart';
 import '../../services/vynex_launcher_service.dart';
-import '../../shared/widgets/status_badge.dart';
 
 class OverviewPage extends StatefulWidget {
   final ValueChanged<String>? onNavigate;
@@ -18,34 +15,8 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
-  final _remoteIdController = TextEditingController(text: '948 201 543');
-  final String _localId = '832 910 119';
-  String _oneTimePassword = 'vyn${Random().nextInt(900) + 100}';
-  bool _obscurePassword = false;
-
-  void _refreshPassword() {
-    setState(() {
-      const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-      final rand = Random();
-      _oneTimePassword = List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã làm mới mật khẩu một lần của máy này'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _copyToClipboard(String text, String label) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Đã sao chép $label vào bộ nhớ tạm: $text'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
+  final _remoteIdController = TextEditingController();
+  final _remotePasswordController = TextEditingController();
 
   void _connectToRemote(String targetId, {bool isFileTransfer = false}) async {
     if (targetId.trim().isEmpty) {
@@ -63,9 +34,11 @@ class _OverviewPageState extends State<OverviewPage> {
       orElse: () => mock.devices.first,
     );
 
-    // Kiểm tra quyền trên bảng Permissions
-    final hasPerm = permService.hasPermission(auth.currentUser.userId, device.deviceId);
+    // Kiểm tra quyền trên bảng Permissions (Admin luôn có quyền kết nối)
+    final isAdmin = auth.currentUser.role == UserRole.admin;
+    final hasPerm = isAdmin || permService.hasPermission(auth.currentUser.userId, device.deviceId);
     if (!hasPerm) {
+      final actionType = isFileTransfer ? 'truyền tệp' : 'điều khiển màn hình';
       showDialog(
         context: context,
         builder: (ctx) {
@@ -88,8 +61,8 @@ class _OverviewPageState extends State<OverviewPage> {
               ],
             ),
             content: Text(
-              'Bạn không có quyền thực hiện kết nối tới thiết bị "${device.name}" (ID: ${device.vynexId}).\n'
-              'Chính sách Vynex yêu cầu quản trị viên cấp quyền trước khi khởi tạo phiên.',
+              'Bạn (${auth.currentUser.fullName}) chưa được Quản trị viên cấp quyền $actionType tới máy "${device.name}" (ID: ${device.vynexId}).\n\n'
+              'Chính sách bảo mật Vynex RBAC yêu cầu Admin cấp quyền trước khi khởi tạo phiên.',
               style: TextStyle(
                 color: isDarkDialog ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                 fontSize: 13,
@@ -101,23 +74,29 @@ class _OverviewPageState extends State<OverviewPage> {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Đóng'),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () async {
-                await permService.grantPermission(
+                await permService.requestPermission(
                   itUserId: auth.currentUser.userId,
                   itName: auth.currentUser.fullName,
                   deviceId: device.deviceId,
                   deviceName: device.name,
                   vynexId: device.vynexId,
-                  permissionType: 'control',
-                  durationType: '24h',
+                  requestId: 0,
+                  reason: 'Yêu cầu quyền $actionType tới máy ${device.name} (Vynex ID: ${device.vynexId})',
                 );
                 if (!mounted) return;
                 Navigator.pop(ctx);
-                _connectToRemote(targetId, isFileTransfer: isFileTransfer);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã gửi yêu cầu cấp quyền tới Quản trị viên (Admin)!'),
+                    backgroundColor: Color(0xFFF59E0B),
+                  ),
+                );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
-              child: const Text('[Demo] Cấp Quyền & Kết Nối'),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white),
+              icon: const Icon(Icons.vpn_key_rounded, size: 16),
+              label: const Text('Gửi Yêu Cầu Xin Cấp Quyền'),
             ),
           ],
         );
@@ -128,10 +107,13 @@ class _OverviewPageState extends State<OverviewPage> {
 
     // Đã có quyền hợp lệ -> Sinh Session Token và gọi Vynex Client (.exe)
     final sessionToken = permService.generateSessionToken(auth.currentUser.userId, device.deviceId);
+    final inputPassword = _remotePasswordController.text.trim();
     final launchResult = await VynexLauncherService.launchClient(
-      vynexId: device.vynexId,
+      vynexId: device.vynexId.isNotEmpty ? device.vynexId : targetId,
       token: sessionToken,
       itUserId: auth.currentUser.userId,
+      password: inputPassword.isNotEmpty ? inputPassword : null,
+      isFileTransfer: isFileTransfer,
     );
 
     if (!mounted) return;
@@ -165,6 +147,7 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void dispose() {
     _remoteIdController.dispose();
+    _remotePasswordController.dispose();
     super.dispose();
   }
 
@@ -276,29 +259,8 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 24),
 
-          // RustDesk Layout Split (Local Device Card + Remote Connect Card)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isStacked = constraints.maxWidth < 840;
-              if (isStacked) {
-                return Column(
-                  children: [
-                    _buildLocalDeviceCard(context, isDark),
-                    const SizedBox(height: 20),
-                    _buildRemoteConnectCard(context, isDark),
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 5, child: _buildLocalDeviceCard(context, isDark)),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 7, child: _buildRemoteConnectCard(context, isDark)),
-                ],
-              );
-            },
-          ),
+          // Remote Connect Card (Full width for Management Dashboard)
+          _buildRemoteConnectCard(context, isDark),
 
           const SizedBox(height: 24),
 
@@ -374,170 +336,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  Widget _buildLocalDeviceCard(BuildContext context, bool isDark) {
-    return Card(
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppConstants.primaryBlue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.computer_rounded, color: AppConstants.primaryBlue, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Thiết bị này của bạn',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const StatusBadge(status: 'online', customLabel: 'Sẵn sàng'),
-              ],
-            ),
-            const SizedBox(height: 18),
-
-            // Local Vynex ID Display
-            Text(
-              'VYNEX ID (MÃ MÁY TÍNH)',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.8,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _localId,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.5,
-                      color: AppConstants.primaryBlue,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy_rounded, size: 18),
-                    tooltip: 'Sao chép Vynex ID',
-                    onPressed: () => _copyToClipboard(_localId, 'Vynex ID'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // One-time password
-            Text(
-              'MẬT KHẨ MỘT LẦN (ONE-TIME PASSWORD)',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.8,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _obscurePassword ? '••••••' : _oneTimePassword,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          size: 18,
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        tooltip: 'Làm mới mật khẩu',
-                        onPressed: _refreshPassword,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-
-            // Metadata info
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Địa chỉ IP:',
-                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-                ),
-                const Text(
-                  '192.168.1.108 (LAN)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Hệ điều hành:',
-                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-                ),
-                const Text(
-                  'Windows 11 Pro 64-bit',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildRemoteConnectCard(BuildContext context, bool isDark) {
     final mock = MockDataService();
 
@@ -581,41 +379,67 @@ class _OverviewPageState extends State<OverviewPage> {
                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
+                  flex: 6,
                   child: TextField(
                     controller: _remoteIdController,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1),
                     decoration: InputDecoration(
-                      hintText: 'Ví dụ: 948 201 543',
-                      prefixIcon: const Icon(Icons.terminal_rounded, size: 20),
+                      hintText: 'Nhập Vynex ID (Ví dụ: 158 939 949)',
+                      prefixIcon: const Icon(Icons.desktop_windows_rounded, size: 20),
                       filled: true,
                       fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () => _connectToRemote(_remoteIdController.text),
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: const Text('Kết Nối'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Expanded(
+                  flex: 4,
+                  child: TextField(
+                    controller: _remotePasswordController,
+                    obscureText: true,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Mật khẩu đối tác (Tùy chọn)',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _connectToRemote(_remoteIdController.text, isFileTransfer: true),
-                  icon: const Icon(Icons.folder_shared_rounded, size: 18),
-                  label: const Text('Truyền Tệp'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _connectToRemote(_remoteIdController.text),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                    label: const Text('Kết Nối'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _connectToRemote(_remoteIdController.text, isFileTransfer: true),
+                    icon: const Icon(Icons.folder_shared_rounded, size: 18),
+                    label: const Text('Truyền Tệp'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
                 ),
               ],
@@ -623,7 +447,7 @@ class _OverviewPageState extends State<OverviewPage> {
 
             const SizedBox(height: 20),
 
-            // Recent devices list
+            // Recent devices list (chỉ hiển thị các máy thực tế khác)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -642,7 +466,10 @@ class _OverviewPageState extends State<OverviewPage> {
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: mock.devices.take(4).map((dev) {
+              children: mock.devices
+                  .where((dev) => dev.deviceId != 2)
+                  .map((dev) {
+                final isSelected = _remoteIdController.text == dev.vynexId;
                 return InkWell(
                   onTap: () {
                     setState(() {
@@ -651,22 +478,23 @@ class _OverviewPageState extends State<OverviewPage> {
                   },
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: _remoteIdController.text == dev.vynexId
+                        color: isSelected
                             ? AppConstants.primaryBlue
                             : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        width: isSelected ? 2 : 1,
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 8,
-                          height: 8,
+                          width: 9,
+                          height: 9,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: dev.isOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
@@ -680,9 +508,10 @@ class _OverviewPageState extends State<OverviewPage> {
                               dev.name,
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                             ),
+                            const SizedBox(height: 2),
                             Text(
                               dev.vynexId,
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
