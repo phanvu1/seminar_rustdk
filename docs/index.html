@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vynex Enterprise - Cổng Tải Phần Mềm Điều Khiển Từ Xa</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --primary: #2563EB;
@@ -18,12 +20,14 @@
       --text: #F8FAFC;
       --text-muted: #94A3B8;
     }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
+
     body {
       background-color: var(--bg);
       color: var(--text);
@@ -32,22 +36,26 @@
       display: flex;
       flex-direction: column;
     }
+
     .container {
       max-width: 1050px;
       margin: 0 auto;
       padding: 0 24px;
       width: 100%;
     }
+
     /* Header */
     header {
       padding: 24px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
+
     .nav {
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
+
     .logo {
       display: flex;
       align-items: center;
@@ -55,6 +63,7 @@
       text-decoration: none;
       color: #fff;
     }
+
     .logo-icon {
       width: 40px;
       height: 40px;
@@ -67,11 +76,13 @@
       font-weight: 800;
       box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
     }
+
     .logo-text {
       font-size: 20px;
       font-weight: 800;
       letter-spacing: 0.5px;
     }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -84,11 +95,13 @@
       font-size: 12px;
       font-weight: 600;
     }
+
     /* Hero */
     .hero {
       text-align: center;
       padding: 50px 0 35px;
     }
+
     .hero-pill {
       display: inline-flex;
       align-items: center;
@@ -102,6 +115,7 @@
       font-weight: 600;
       margin-bottom: 20px;
     }
+
     .hero h1 {
       font-size: 40px;
       font-weight: 800;
@@ -111,12 +125,14 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
     .hero p {
       font-size: 16px;
       color: var(--text-muted);
       max-width: 680px;
       margin: 0 auto;
     }
+
     /* Download Grid: Exactly 2 Operating Systems */
     .cards-grid {
       display: grid;
@@ -124,11 +140,13 @@
       gap: 28px;
       margin: 36px 0;
     }
+
     @media (max-width: 768px) {
       .cards-grid {
         grid-template-columns: 1fr;
       }
     }
+
     .download-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -141,17 +159,21 @@
       position: relative;
       transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
     }
+
     .download-card:hover {
       transform: translateY(-4px);
       border-color: #3B82F6;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
     }
+
     .download-card.windows {
       border-color: rgba(37, 99, 235, 0.5);
     }
+
     .download-card.linux {
       border-color: rgba(234, 88, 12, 0.5);
     }
+
     .card-badge {
       position: absolute;
       top: -12px;
@@ -163,12 +185,15 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+
     .card-badge.blue {
       background: #2563EB;
     }
+
     .card-badge.orange {
       background: #EA580C;
     }
+
     .os-icon {
       width: 64px;
       height: 64px;
@@ -180,17 +205,20 @@
       font-size: 32px;
       margin-bottom: 18px;
     }
+
     .os-title {
       font-size: 22px;
       font-weight: 800;
       margin-bottom: 6px;
     }
+
     .os-sub {
       font-size: 13px;
       color: var(--text-muted);
       margin-bottom: 24px;
       min-height: 40px;
     }
+
     .btn-download {
       display: inline-flex;
       align-items: center;
@@ -209,16 +237,20 @@
       cursor: pointer;
       border: none;
     }
+
     .btn-download:hover {
       background: var(--primary-hover);
     }
+
     .btn-linux {
       background: #EA580C;
       box-shadow: 0 4px 14px rgba(234, 88, 12, 0.3);
     }
+
     .btn-linux:hover {
       background: #C2410C;
     }
+
     .btn-outline {
       margin-top: 10px;
       background: rgba(255, 255, 255, 0.06);
@@ -226,14 +258,17 @@
       color: #E2E8F0;
       box-shadow: none;
     }
+
     .btn-outline:hover {
       background: rgba(255, 255, 255, 0.12);
     }
+
     .meta-info {
       margin-top: 16px;
       font-size: 12px;
       color: var(--text-muted);
     }
+
     /* Comparison / Instructions */
     .instructions {
       background: rgba(30, 41, 59, 0.6);
@@ -242,6 +277,7 @@
       padding: 30px;
       margin: 10px 0 50px;
     }
+
     .instructions h3 {
       font-size: 18px;
       margin-bottom: 20px;
@@ -249,22 +285,26 @@
       align-items: center;
       gap: 10px;
     }
+
     .platform-tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 24px;
     }
+
     @media (max-width: 768px) {
       .platform-tabs {
         grid-template-columns: 1fr;
       }
     }
+
     .guide-box {
       background: rgba(15, 23, 42, 0.7);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
       padding: 20px;
     }
+
     .guide-box h4 {
       font-size: 15px;
       margin-bottom: 12px;
@@ -273,9 +313,11 @@
       align-items: center;
       gap: 8px;
     }
+
     .guide-box.linux-guide h4 {
       color: #FB923C;
     }
+
     .guide-step {
       font-size: 13px;
       margin-bottom: 10px;
@@ -283,10 +325,12 @@
       display: flex;
       gap: 8px;
     }
+
     .guide-step span {
       font-weight: bold;
       color: #94A3B8;
     }
+
     code {
       background: rgba(0, 0, 0, 0.4);
       padding: 3px 8px;
@@ -296,6 +340,7 @@
       font-size: 12px;
       word-break: break-all;
     }
+
     /* Footer */
     footer {
       margin-top: auto;
@@ -307,6 +352,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <header>
@@ -327,7 +373,8 @@
         🛡️ Phân Quyền RBAC • Mã Hóa P2P • VPN WireGuard Cô Lập
       </div>
       <h1>Cổng Tải Phần Mềm Điều Khiển Từ Xa</h1>
-      <p>Hệ thống hỗ trợ kỹ thuật và giám sát máy tính doanh nghiệp tập trung. Tải và cài đặt trực tiếp cho hai nền tảng trọng tâm: Windows và Ubuntu Linux.</p>
+      <p>Hệ thống hỗ trợ kỹ thuật và giám sát máy tính doanh nghiệp tập trung. Tải và cài đặt trực tiếp cho hai nền tảng
+        trọng tâm: Windows và Ubuntu Linux.</p>
     </section>
 
     <!-- Download Grid for Windows & Ubuntu Linux -->
@@ -338,7 +385,8 @@
         <div class="os-icon">🪟</div>
         <h2 class="os-title">Windows 64-bit</h2>
         <div class="os-sub">Trọn bộ Vynex Client Engine & Management Dashboard điều hành</div>
-        <a href="https://github.com/phanvu1/seminar_rustdk/releases/download/v2.0.0/Vynex_Enterprise_Windows_v2.0.zip" class="btn-download" target="_blank">
+        <a href="https://github.com/phanvu1/seminar_rustdk/releases/download/v2.0.0/Vynex_Enterprise_Windows_v2.0.zip"
+          class="btn-download" target="_blank">
           <span>⬇</span> Tải Vynex cho Windows (.zip)
         </a>
         <div class="meta-info">Phiên bản v2.0 Enterprise • 66.3 MB • Win 10/11</div>
@@ -350,7 +398,8 @@
         <div class="os-icon">🐧</div>
         <h2 class="os-title">Ubuntu Linux 64-bit</h2>
         <div class="os-sub">Gói thiết lập tự động Vynex Client & WireGuard kết nối VPS</div>
-        <a href="https://github.com/phanvu1/seminar_rustdk/releases/download/v2.0.0/Vynex_Enterprise_Linux_v2.0.tar.gz" class="btn-download btn-linux" target="_blank">
+        <a href="https://github.com/phanvu1/seminar_rustdk/releases/download/v2.0.0/Vynex_Enterprise_Linux_v2.0.tar.gz"
+          class="btn-download btn-linux" target="_blank">
           <span>⬇</span> Tải Gói Cài Đặt Linux (.tar.gz)
         </a>
         <button onclick="copyLinuxCmd(event)" class="btn-download btn-outline">
@@ -374,7 +423,8 @@
             <span>2.</span> Chạy file <code>run_vynex.bat</code> để kích hoạt Client và Dashboard.
           </div>
           <div class="guide-step">
-            <span>3.</span> Đăng nhập: <code>admin</code> (Quản trị) hoặc <code>it</code> (Kỹ thuật), pass: <code>123</code>.
+            <span>3.</span> Đăng nhập bằng tài khoản doanh nghiệp được cấp, hoặc mở ứng dụng để nhận mã ID/OTP hỗ trợ kỹ
+            thuật.
           </div>
         </div>
 
@@ -418,4 +468,5 @@
     }
   </script>
 </body>
+
 </html>
