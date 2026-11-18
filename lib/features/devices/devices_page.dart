@@ -526,38 +526,81 @@ class _DevicesPageState extends State<DevicesPage> {
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (!hasPerm && !isAdmin && auth.activeRole == UserRole.it) ...[
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    await permService.requestPermission(
-                                      itUserId: auth.currentUser.userId,
-                                      itName: auth.currentUser.fullName,
-                                      deviceId: dev.deviceId,
-                                      deviceName: dev.name,
-                                      vynexId: dev.vynexId,
-                                      reason: 'Yêu cầu quyền điều khiển từ xa thiết bị ${dev.name}',
-                                    );
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
-                                        backgroundColor: Color(0xFFF59E0B),
+                              if (dev.userId == 1 && auth.currentUser.userId != 1) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.shield_rounded, size: 14, color: Color(0xFFDC2626)),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Bảo Vệ Admin (Cấm Điều Khiển)',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
                                       ),
-                                    );
-                                  },
-                                  icon: Icon(hasRequested ? Icons.hourglass_top_rounded : Icons.vpn_key_rounded, size: 14),
-                                  label: Text(hasRequested ? 'Đã gửi yêu cầu' : 'Yêu cầu cấp quyền kết nối'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: hasRequested ? const Color(0xFFD97706) : const Color(0xFFF59E0B),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                              ],
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  if (!hasPerm) {
+                              ] else ...[
+                                if (!hasPerm && !isAdmin && auth.activeRole == UserRole.it) ...[
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      await permService.requestPermission(
+                                        itUserId: auth.currentUser.userId,
+                                        itName: auth.currentUser.fullName,
+                                        deviceId: dev.deviceId,
+                                        deviceName: dev.name,
+                                        vynexId: dev.vynexId,
+                                        reason: 'Yêu cầu quyền điều khiển từ xa thiết bị ${dev.name}',
+                                      );
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Đã gửi yêu cầu xin cấp quyền tới Admin!'),
+                                          backgroundColor: Color(0xFFF59E0B),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(hasRequested ? Icons.hourglass_top_rounded : Icons.vpn_key_rounded, size: 14),
+                                    label: Text(hasRequested ? 'Đã gửi yêu cầu' : 'Yêu cầu cấp quyền kết nối'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: hasRequested ? const Color(0xFFD97706) : const Color(0xFFF59E0B),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    if (dev.userId == 1 && auth.currentUser.userId != 1) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (c) => AlertDialog(
+                                          title: const Row(
+                                            children: [
+                                              Icon(Icons.shield_rounded, color: Color(0xFFEF4444)),
+                                              SizedBox(width: 8),
+                                              Text('Bảo Vệ Máy Quản Trị Viên'),
+                                            ],
+                                          ),
+                                          content: const Text(
+                                            'Đây là thiết bị của Quản Trị Viên (Admin).\n\n'
+                                            'Chính sách bảo mật Unidirectional Guard nghiêm cấm mọi tài khoản khác điều khiển máy của Admin dưới bất kỳ hình thức nào!',
+                                          ),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Đã hiểu')),
+                                          ],
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (!hasPerm) {
                                     showDialog(
                                       context: context,
                                       builder: (c) {
@@ -664,8 +707,9 @@ class _DevicesPageState extends State<DevicesPage> {
                                 onPressed: () => _showDeleteConfirm(context, dev),
                               ),
                             ],
-                          );
-                        },
+                          ],
+                        );
+                      },
                       ),
                     ],
                   ),

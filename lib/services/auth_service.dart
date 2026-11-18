@@ -58,45 +58,60 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<Map<String, dynamic>> login(String username, String password) async {
     final u = username.trim().toLowerCase();
     final p = password.trim();
 
-    // Mật khẩu hệ thống chấp nhận 123 hoặc 123456
-    if (p != '123' && p != '123456') {
-      return false;
+    if (u.isEmpty || p.isEmpty) {
+      return {'success': false, 'message': 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!'};
     }
 
-    // Thử kết nối API Backend nếu có sẵn
-    try {
-      final apiRes = await ApiService().login(u, p);
-      if (apiRes['token'] != null) {
-        ApiService().setJwtToken(apiRes['token']);
-      }
-    } catch (_) {}
+    final apiRes = await ApiService().login(u, p);
+    if (apiRes['success'] == true) {
+      final userData = apiRes['user'] ?? {};
+      final roleId = userData['role_id'] is int
+          ? userData['role_id']
+          : int.tryParse(userData['role_id']?.toString() ?? '') ?? 3;
+      final role = roleId == 1 ? UserRole.admin : (roleId == 2 ? UserRole.it : UserRole.employee);
 
-    // Khớp tài khoản theo đúng 4 Actor nghiệp vụ (admin, it, it2, nhanvien)
-    final UserModel matchedUser;
-    if (u == 'admin' || u == 'quantri') {
-      matchedUser = MockDataService().users.firstWhere((usr) => usr.username == 'admin');
-    } else if (u == 'it' || u == 'it1' || u == 'it_support' || u == 'tranthib') {
-      matchedUser = MockDataService().users.firstWhere((usr) => usr.username == 'it');
-    } else if (u == 'it2' || u == 'it_nam' || u == 'nam' || u == 'lehoangnam') {
-      matchedUser = MockDataService().users.firstWhere((usr) => usr.username == 'it2');
-    } else if (u == 'nhanvien' || u == 'ketoan' || u == 'mai' || u == 'kt_mai' || u == 'phamthimai') {
-      matchedUser = MockDataService().users.firstWhere((usr) => usr.role == UserRole.employee);
-    } else {
-      matchedUser = MockDataService().users.firstWhere(
-            (usr) => usr.username.toLowerCase() == u,
-            orElse: () => MockDataService().users.first,
+      final loggedInUser = UserModel(
+        userId: userData['user_id'] is int
+            ? userData['user_id']
+            : int.tryParse(userData['user_id']?.toString() ?? '') ?? 999,
+        username: userData['username'] ?? u,
+        fullName: userData['full_name'] ?? u,
+        role: role,
+        departmentId: userData['department_id'] is int
+            ? userData['department_id']
+            : int.tryParse(userData['department_id']?.toString() ?? ''),
+        departmentName: userData['department_name'],
+        email: userData['email'],
+        phone: userData['phone'],
+        status: userData['status'] ?? 'active',
+      );
+
+      // Đồng bộ thông tin người dùng vào danh sách cục bộ
+      final idx = MockDataService().users.indexWhere(
+            (usr) => usr.userId == loggedInUser.userId || usr.username.toLowerCase() == u,
           );
-    }
+      if (idx != -1) {
+        MockDataService().users[idx] = loggedInUser;
+      } else {
+        MockDataService().users.add(loggedInUser);
+      }
 
-    _currentUser = matchedUser;
-    _activeRole = matchedUser.role;
-    _isAuthenticated = true;
-    notifyListeners();
-    return true;
+      _currentUser = loggedInUser;
+      _activeRole = loggedInUser.role;
+      _isAuthenticated = true;
+      notifyListeners();
+      return {'success': true};
+    } else {
+      return {
+        'success': false,
+        'isLocked': apiRes['isLocked'] == true,
+        'message': apiRes['message'] ?? 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+      };
+    }
   }
 
   void logout() {

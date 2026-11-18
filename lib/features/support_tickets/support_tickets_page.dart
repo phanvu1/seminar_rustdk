@@ -250,6 +250,45 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     final auth = Provider.of<AuthService>(context, listen: false);
     final permService = Provider.of<PermissionService>(context, listen: false);
 
+    // BẢO VỆ TỐI CAO MÁY ADMIN (UNIDIRECTIONAL GUARD):
+    // Tuyệt đối không một kỹ thuật viên nào được phép kết nối điều khiển máy của Admin
+    final mock = MockDataService();
+    final targetDev = mock.devices.where((d) => d.deviceId == ticket.deviceId).toList();
+    final isTargetAdmin = ticket.employeeId == 1 || (targetDev.isNotEmpty && targetDev.first.userId == 1);
+
+    if (isTargetAdmin && auth.currentUser.userId != 1) {
+      showDialog(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.shield_rounded, color: Color(0xFFEF4444)),
+                SizedBox(width: 10),
+                Text('Bảo Vệ Tối Cao Quản Trị Viên (Admin Shield)'),
+              ],
+            ),
+            content: const Text(
+              'Thiết bị này thuộc quyền sở hữu của Quản Trị Viên Tối Cao (Admin).\n\n'
+              'Theo chính sách bảo mật Zero-Trust doanh nghiệp của Vynex Enterprise:\n'
+              '• Kỹ thuật viên (IT Staff) và nhân viên tuyệt đối không thể kết nối điều khiển máy của Admin dưới bất kỳ hình thức nào, kể cả khi có yêu cầu hỗ trợ.',
+              style: TextStyle(height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đã hiểu'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
     // Kịch bản 1: Kiểm tra quyền truy cập máy
     final hasPerm = permService.hasPermission(auth.currentUser.userId, ticket.deviceId);
 

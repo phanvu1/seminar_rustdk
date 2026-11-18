@@ -803,6 +803,11 @@ def get_permissions(db: Session = Depends(get_db)):
 def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
     """Admin cấp quyền truy cập thiết bị có thời hạn (Mặc định 24h)"""
     try:
+        # BẢO VỆ ADMIN: Không bao giờ cấp quyền điều khiển máy của Admin cho người khác
+        dev_chk = db.execute(text("SELECT user_id FROM Devices WHERE device_id = :did"), {"did": req.device_id}).fetchone()
+        if dev_chk and dev_chk[0] == 1:
+            raise HTTPException(status_code=400, detail="Chính sách bảo mật: Không thể cấp quyền điều khiển máy tính của Quản Trị Viên (Admin) cho bất kỳ ai!")
+
         query = text("""
             INSERT INTO Permissions (user_id, device_id, permission_type, granted_by, granted_at, expires_at, status, notes)
             VALUES (:uid, :did, :ptype, 1, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL :hours HOUR), 1, :notes)
@@ -876,21 +881,33 @@ def revoke_permission(id: int, db: Session = Depends(get_db)):
 @app.get("/api/permissions/verify-access")
 def check_permission(user_id: int = 0, rustdesk_id: str = "", device_id: int = 0, token: str = "", db: Session = Depends(get_db)):
     """Kiểm tra quyền điều khiển chặt chẽ theo RBAC"""
-    # 1. Nếu là Admin (user_id = 1) -> Cho phép toàn quyền
-    if user_id == 1:
-        return {
-            "allowed": True,
-            "permission_type": "full",
-            "reason": "Admin có toàn quyền quản trị hệ thống"
-        }
-
-    # 2. Xác định device_id nếu truyền rustdesk_id
+    # 0. Xác định device_id nếu truyền rustdesk_id
     target_device_id = device_id
     if not target_device_id and rustdesk_id:
         clean_vynex_id = rustdesk_id.replace(" ", "").strip()
         dev_row = db.execute(text("SELECT device_id FROM Devices WHERE REPLACE(rustdesk_id, ' ', '') = :rid"), {"rid": clean_vynex_id}).fetchone()
         if dev_row:
             target_device_id = dev_row[0]
+
+    # 1. BẢO VỆ TỐI CAO ADMIN (UNIDIRECTIONAL GUARD):
+    # Tuyệt đối cấm mọi máy khác điều khiển máy của Admin (user_id = 1)
+    if target_device_id:
+        dev_owner = db.execute(text("SELECT user_id FROM Devices WHERE device_id = :did"), {"did": target_device_id}).fetchone()
+        if dev_owner and dev_owner[0] == 1 and user_id != 1:
+            return {
+                "allowed": False,
+                "permission_type": None,
+                "expires_at": None,
+                "reason": "CHÍNH SÁCH BẢO MẬT: Máy tính Quản trị viên (Admin) được bảo vệ tối cao (Unidirectional Guard). Không một máy tính hoặc tài khoản nào khác được phép điều khiển máy của Admin!"
+            }
+
+    # 2. Nếu là Admin (user_id = 1) -> Cho phép toàn quyền
+    if user_id == 1:
+        return {
+            "allowed": True,
+            "permission_type": "full",
+            "reason": "Admin có toàn quyền quản trị hệ thống"
+        }
 
     # 3. Tra cứu bảng Permissions xem IT user_id này có quyền hợp lệ trên thiết bị không
     if user_id and target_device_id:
@@ -954,6 +971,15 @@ def start_session(req: SessionCreate, db: Session = Depends(get_db)):
         tdev = req.target_device_id or req.device_id or 1
         sdev = req.source_device_id or 2
         target = req.target_user_id or 4
+
+        # BẢO VỆ ADMIN: Chặn phiên kết nối vào máy Admin nếu người khởi tạo không phải Admin
+        dev_chk = db.execute(text("SELECT user_id FROM Devices WHERE device_id = :did"), {"did": tdev}).fetchone()
+        if (target == 1 or (dev_chk and dev_chk[0] == 1)) and req.it_user_id != 1:
+            raise HTTPException(
+                status_code=403,
+                detail="Chính sách bảo mật: Máy tính Quản Trị Viên (Admin) được bảo vệ tối cao, không một máy nào khác có thể điều khiển!"
+            )
+
         query = text("""
             INSERT INTO RemoteSessions (request_id, it_user_id, target_user_id, source_device_id, target_device_id, connection_type, start_time, status)
             VALUES (:rid, :it, :target, :sdev, :tdev, :ctype, CURRENT_TIMESTAMP, 'started')

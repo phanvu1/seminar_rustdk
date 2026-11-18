@@ -32,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     final auth = Provider.of<AuthService>(context, listen: false);
-    final success = await auth.login(
+    final result = await auth.login(
       _usernameController.text.trim(),
       _passwordController.text.trim(),
     );
@@ -42,9 +42,9 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = false;
     });
 
-    if (!success) {
+    if (result['success'] != true) {
       setState(() {
-        _errorMessage = 'Tên đăng nhập hoặc mật khẩu không chính xác.\nMật khẩu mặc định hệ thống: 123 (hoặc 123456)\nTài khoản: admin (Admin), it / it2 (Kỹ thuật), nhanvien (Nhân viên)';
+        _errorMessage = result['message'] ?? 'Tên đăng nhập hoặc mật khẩu không chính xác.';
       });
     }
   }

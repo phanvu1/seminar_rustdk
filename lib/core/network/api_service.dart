@@ -67,38 +67,97 @@ class ApiService extends ChangeNotifier {
 
   // --- AUTH ---
   Future<Map<String, dynamic>> login(String username, String password) async {
+    final cleanU = username.trim().toLowerCase();
+    final cleanP = password.trim();
+
     try {
       final uri = Uri.parse('$_baseUrl/api/auth/login');
       final res = await http
-          .post(uri, headers: _buildHeaders(), body: jsonEncode({'username': username, 'password': password}))
+          .post(uri, headers: _buildHeaders(), body: jsonEncode({'username': cleanU, 'password': cleanP}))
           .timeout(AppConstants.apiTimeout);
 
       if (res.statusCode == 200) {
         final data = jsonDecode(utf8.decode(res.bodyBytes));
         _isBackendConnected = true;
         _jwtToken = data['token'] ?? 'jwt-vynex-token';
+
+        // Tải toàn bộ danh sách mới nhất từ DB
+        await getUsers();
+        await getDepartments();
+        await getDevices();
+
         notifyListeners();
-        return {'success': true, 'data': data, 'token': _jwtToken, 'isFallback': false};
+        return {
+          'success': true,
+          'data': data,
+          'token': _jwtToken,
+          'user': data['user'],
+          'isFallback': false,
+        };
+      } else if (res.statusCode == 403) {
+        // Tài khoản bị khóa / ngừng kích hoạt -> CHẶN ĐĂNG NHẬP, BÁO LỖI
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        return {
+          'success': false,
+          'isLocked': true,
+          'message': data['detail'] ?? 'Tài khoản này đang bị khóa. Vui lòng liên hệ Admin để mở khóa.',
+        };
+      } else if (res.statusCode == 401) {
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        return {
+          'success': false,
+          'isLocked': false,
+          'message': data['detail'] ?? 'Sai tên đăng nhập hoặc mật khẩu.',
+        };
       }
     } catch (e) {
-      debugPrint('[ApiService] login fallback due to: $e');
+      debugPrint('[ApiService] login network exception: $e');
     }
 
-    // Smart Fallback
+    // Nếu không kết nối được máy chủ VPN (10.13.13.1), kiểm tra bộ nhớ mock
+    // TUYỆT ĐỐI KHÔNG FALLBACK VỀ TÀI KHOẢN ADMIN NẾU KHÔNG PHẢI ADMIN!
     _isBackendConnected = false;
     notifyListeners();
-    final mockUser = MockDataService().users.firstWhere(
-          (u) => u.username.toLowerCase() == username.toLowerCase(),
-          orElse: () => MockDataService().users.first,
-        );
-    _jwtToken = 'jwt-mock-token-${mockUser.userId}';
+
+    final localMatches = MockDataService().users.where((u) => u.username.toLowerCase() == cleanU).toList();
+    if (localMatches.isNotEmpty) {
+      final u = localMatches.first;
+      if (u.status != 'active') {
+        return {
+          'success': false,
+          'isLocked': true,
+          'message': 'Tài khoản \'${u.username}\' đang ở trạng thái bị khóa.',
+        };
+      }
+      if (cleanP == '123' || cleanP == '123456') {
+        _jwtToken = 'jwt-mock-token-${u.userId}';
+        return {
+          'success': true,
+          'isFallback': true,
+          'token': _jwtToken,
+          'user': {
+            'user_id': u.userId,
+            'username': u.username,
+            'full_name': u.fullName,
+            'role_id': u.role.roleId,
+            'role_name': u.role == UserRole.admin ? 'admin' : (u.role == UserRole.it ? 'it' : 'user'),
+            'department_id': u.departmentId,
+            'status': u.status,
+          },
+        };
+      } else {
+        return {
+          'success': false,
+          'isLocked': false,
+          'message': 'Sai mật khẩu (Mặc định: 123).',
+        };
+      }
+    }
+
     return {
-      'success': true,
-      'isFallback': true,
-      'user_id': mockUser.userId,
-      'role_id': mockUser.role.roleId,
-      'token': _jwtToken,
-      'user': mockUser,
+      'success': false,
+      'isLocked': false,
+      'message': 'Không tìm thấy tài khoản \'$cleanU\' hoặc chưa kết nối WireGuard VPN (10.13.13.1).\nVui lòng kích hoạt WireGuard trên máy này và thử lại!',
     };
   }
 

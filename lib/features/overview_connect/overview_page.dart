@@ -29,14 +29,49 @@ class _OverviewPageState extends State<OverviewPage> {
     final auth = Provider.of<AuthService>(context, listen: false);
     final permService = Provider.of<PermissionService>(context, listen: false);
     final mock = MockDataService();
-    final device = mock.devices.firstWhere(
-      (d) => d.vynexId.replaceAll(' ', '') == targetId.replaceAll(' ', ''),
-      orElse: () => mock.devices.first,
-    );
+    final cleanTarget = targetId.replaceAll(' ', '');
+    final matchDev = mock.devices.where((d) => d.vynexId.replaceAll(' ', '') == cleanTarget).toList();
+    final device = matchDev.isNotEmpty ? matchDev.first : null;
+
+    // BẢO VỆ TỐI CAO ADMIN (UNIDIRECTIONAL GUARD):
+    // Tuyệt đối không cho phép máy khác kết nối điều khiển máy của Admin (userId == 1)
+    final isTargetAdmin = (device != null && (device.userId == 1 || device.name.toLowerCase().contains('admin')));
+    if (isTargetAdmin && auth.currentUser.userId != 1) {
+      showDialog(
+        context: context,
+        builder: (ctx) {
+          final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkDialog ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.shield_rounded, color: Color(0xFFEF4444)),
+                SizedBox(width: 10),
+                Text('Bảo Vệ Tối Cao Quản Trị Viên'),
+              ],
+            ),
+            content: const Text(
+              'Thiết bị này thuộc quyền sở hữu của Quản Trị Viên Tối Cao (Admin).\n\n'
+              'Chính sách bảo mật Unidirectional Guard của Vynex Enterprise nghiêm cấm mọi tài khoản khác kết nối điều khiển máy tính của Admin dưới bất kỳ hình thức nào!',
+              style: TextStyle(height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đã hiểu'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
 
     // Kiểm tra quyền trên bảng Permissions (Admin luôn có quyền kết nối)
     final isAdmin = auth.currentUser.role == UserRole.admin;
-    final hasPerm = isAdmin || permService.hasPermission(auth.currentUser.userId, device.deviceId);
+    final targetDevId = device?.deviceId ?? 0;
+    final hasPerm = isAdmin || (targetDevId > 0 && permService.hasPermission(auth.currentUser.userId, targetDevId));
     if (!hasPerm) {
       final actionType = isFileTransfer ? 'truyền tệp' : 'điều khiển màn hình';
       showDialog(
@@ -61,7 +96,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ],
             ),
             content: Text(
-              'Bạn (${auth.currentUser.fullName}) chưa được Quản trị viên cấp quyền $actionType tới máy "${device.name}" (ID: ${device.vynexId}).\n\n'
+              'Bạn (${auth.currentUser.fullName}) chưa được Quản trị viên cấp quyền $actionType tới máy "${device?.name ?? targetId}" (ID: $targetId).\n\n'
               'Chính sách bảo mật Vynex RBAC yêu cầu Admin cấp quyền trước khi khởi tạo phiên.',
               style: TextStyle(
                 color: isDarkDialog ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
@@ -74,30 +109,31 @@ class _OverviewPageState extends State<OverviewPage> {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Đóng'),
             ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                await permService.requestPermission(
-                  itUserId: auth.currentUser.userId,
-                  itName: auth.currentUser.fullName,
-                  deviceId: device.deviceId,
-                  deviceName: device.name,
-                  vynexId: device.vynexId,
-                  requestId: 0,
-                  reason: 'Yêu cầu quyền $actionType tới máy ${device.name} (Vynex ID: ${device.vynexId})',
-                );
-                if (!mounted) return;
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã gửi yêu cầu cấp quyền tới Quản trị viên (Admin)!'),
-                    backgroundColor: Color(0xFFF59E0B),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white),
-              icon: const Icon(Icons.vpn_key_rounded, size: 16),
-              label: const Text('Gửi Yêu Cầu Xin Cấp Quyền'),
-            ),
+            if (device != null)
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await permService.requestPermission(
+                    itUserId: auth.currentUser.userId,
+                    itName: auth.currentUser.fullName,
+                    deviceId: device.deviceId,
+                    deviceName: device.name,
+                    vynexId: device.vynexId,
+                    requestId: 0,
+                    reason: 'Yêu cầu quyền $actionType tới máy ${device.name} (Vynex ID: ${device.vynexId})',
+                  );
+                  if (!mounted) return;
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã gửi yêu cầu cấp quyền tới Quản trị viên (Admin)!'),
+                      backgroundColor: Color(0xFFF59E0B),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white),
+                icon: const Icon(Icons.vpn_key_rounded, size: 16),
+                label: const Text('Gửi Yêu Cầu Xin Cấp Quyền'),
+              ),
           ],
         );
       },
@@ -106,10 +142,14 @@ class _OverviewPageState extends State<OverviewPage> {
     }
 
     // Đã có quyền hợp lệ -> Sinh Session Token và gọi Vynex Client (.exe)
-    final sessionToken = permService.generateSessionToken(auth.currentUser.userId, device.deviceId);
+    final targetDeviceId = device?.deviceId ?? 0;
+    final targetDeviceName = device?.name ?? 'Thiết bị $targetId';
+    final targetVynexId = device?.vynexId ?? targetId;
+
+    final sessionToken = permService.generateSessionToken(auth.currentUser.userId, targetDeviceId);
     final inputPassword = _remotePasswordController.text.trim();
     final launchResult = await VynexLauncherService.launchClient(
-      vynexId: device.vynexId.isNotEmpty ? device.vynexId : targetId,
+      vynexId: targetVynexId,
       token: sessionToken,
       itUserId: auth.currentUser.userId,
       password: inputPassword.isNotEmpty ? inputPassword : null,
@@ -126,7 +166,7 @@ class _OverviewPageState extends State<OverviewPage> {
               const Icon(Icons.check_circle_rounded, color: Colors.white),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Đã kích hoạt Vynex Client (.exe) kết nối máy ${device.name} (${device.vynexId})'),
+                child: Text('Đã kích hoạt Vynex Client (.exe) kết nối máy $targetDeviceName ($targetVynexId)'),
               ),
             ],
           ),
