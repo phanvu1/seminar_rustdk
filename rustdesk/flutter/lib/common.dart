@@ -3003,12 +3003,12 @@ class ServerConfig {
                 options['custom-rendezvous-server'].toString().trim().isNotEmpty &&
                 !options['custom-rendezvous-server'].toString().startsWith('192.168.'))
             ? options['custom-rendezvous-server'].toString().trim()
-            : "34.87.182.49",
+            : "10.13.13.1",
         relayServer = (options['relay-server'] != null &&
                 options['relay-server'].toString().trim().isNotEmpty &&
                 !options['relay-server'].toString().startsWith('192.168.'))
             ? options['relay-server'].toString().trim()
-            : "34.87.182.49",
+            : "10.13.13.1:21117",
         apiServer = (options['api-server'] != null &&
                 options['api-server'].toString().trim().isNotEmpty &&
                 !options['api-server'].toString().startsWith('192.168.'))

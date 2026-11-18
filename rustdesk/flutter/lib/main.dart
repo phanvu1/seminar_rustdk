@@ -137,9 +137,10 @@ void runMainApp(bool startService) async {
   // Ensure default Vynex Enterprise Server if unset or old local IP
   try {
     final curId = bind.mainGetOptionSync(key: 'custom-rendezvous-server').trim();
-    if (curId.isEmpty || curId.startsWith('192.168.')) {
-      await bind.mainSetOption(key: 'custom-rendezvous-server', value: '34.87.182.49');
-      await bind.mainSetOption(key: 'relay-server', value: '34.87.182.49');
+    if (curId.isEmpty || curId.startsWith('192.168.') || curId == '34.87.182.49') {
+      await bind.mainSetOption(key: 'custom-rendezvous-server', value: '10.13.13.1');
+      await bind.mainSetOption(key: 'relay-server', value: '10.13.13.1:21117');
+      await bind.mainSetOption(key: 'api-server', value: 'http://34.87.182.49:8000');
       await bind.mainSetOption(key: 'key', value: 'NUvcbnr2VL3iLPCvmn2DjoZGMEtbQ27aEW1djMgev+M=');
     }
   } catch (e) {
