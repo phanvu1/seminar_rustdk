@@ -153,6 +153,60 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> updateUser(int id, Map<String, dynamic> data) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/users/$id');
+      final res = await http
+          .put(uri, headers: _buildHeaders(), body: jsonEncode(data))
+          .timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        await getUsers();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] updateUser fallback due to: $e');
+    }
+    // Fallback MockDataService
+    final idx = MockDataService().users.indexWhere((u) => u.userId == id);
+    if (idx != -1) {
+      final old = MockDataService().users[idx];
+      MockDataService().users[idx] = UserModel(
+        userId: old.userId,
+        username: old.username,
+        fullName: data['full_name'] ?? old.fullName,
+        role: data['role_id'] != null
+            ? (data['role_id'] == 1 ? UserRole.admin : (data['role_id'] == 2 ? UserRole.it : UserRole.employee))
+            : old.role,
+        departmentId: data['department_id'] ?? old.departmentId,
+        departmentName: data['department_name'] ?? old.departmentName,
+        email: data['email'] ?? old.email,
+        phone: data['phone'] ?? old.phone,
+        status: data['status'] ?? old.status,
+        lastLogin: old.lastLogin,
+      );
+      notifyListeners();
+    }
+    return true;
+  }
+
+  Future<bool> deleteUser(int id) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/users/$id');
+      final res = await http.delete(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        await getUsers();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] deleteUser fallback due to: $e');
+    }
+    MockDataService().users.removeWhere((u) => u.userId == id);
+    notifyListeners();
+    return true;
+  }
+
   // --- DEVICES ---
   Future<List<DeviceModel>> getDevices() async {
     try {
@@ -447,7 +501,100 @@ class ApiService extends ChangeNotifier {
 
   // --- DEPARTMENTS ---
   Future<List<DepartmentModel>> getDepartments() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/departments');
+      final res = await http.get(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(res.bodyBytes));
+        final list = (json['data'] as List).map((e) => DepartmentModel.fromJson(e)).toList();
+        if (list.isNotEmpty) {
+          MockDataService().departments = list;
+          _isBackendConnected = true;
+          notifyListeners();
+          return list;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiService] getDepartments fallback: $e');
+    }
     return MockDataService().departments;
+  }
+
+  Future<bool> createDepartment(Map<String, dynamic> data) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/departments');
+      final res = await http
+          .post(uri, headers: _buildHeaders(), body: jsonEncode(data))
+          .timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        _isBackendConnected = true;
+        await getDepartments();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] createDepartment fallback: $e');
+    }
+    final newId = MockDataService().departments.length + 1;
+    final dept = DepartmentModel(
+      departmentId: newId,
+      name: data['name'] ?? 'Phòng ban #$newId',
+      description: data['description'],
+      managerId: data['manager_id'],
+      managerName: data['manager_name'],
+      memberCount: 0,
+      deviceCount: 0,
+    );
+    MockDataService().departments.add(dept);
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> updateDepartment(int id, Map<String, dynamic> data) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/departments/$id');
+      final res = await http
+          .put(uri, headers: _buildHeaders(), body: jsonEncode(data))
+          .timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        await getDepartments();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] updateDepartment fallback: $e');
+    }
+    final idx = MockDataService().departments.indexWhere((d) => d.departmentId == id);
+    if (idx != -1) {
+      final old = MockDataService().departments[idx];
+      MockDataService().departments[idx] = DepartmentModel(
+        departmentId: old.departmentId,
+        name: data['name'] ?? old.name,
+        description: data['description'] ?? old.description,
+        managerId: data['manager_id'] ?? old.managerId,
+        managerName: data['manager_name'] ?? old.managerName,
+        memberCount: old.memberCount,
+        deviceCount: old.deviceCount,
+      );
+      notifyListeners();
+    }
+    return true;
+  }
+
+  Future<bool> deleteDepartment(int id) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/departments/$id');
+      final res = await http.delete(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        await getDepartments();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] deleteDepartment fallback: $e');
+    }
+    MockDataService().departments.removeWhere((d) => d.departmentId == id);
+    notifyListeners();
+    return true;
   }
 
   // --- NOTIFICATIONS (THEO TAB 2, TAB 3 & LỖI 2.2) ---

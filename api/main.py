@@ -172,7 +172,7 @@ class LoginRequest(BaseModel):
 
 class UserCreate(BaseModel):
     username: str
-    password_hash: str
+    password_hash: Optional[str] = "123"
     full_name: str
     role_id: int = 3
     department_id: Optional[int] = None
@@ -187,6 +187,18 @@ class UserUpdate(BaseModel):
     branch_id: Optional[int] = None
     status: Optional[str] = None
     email: Optional[str] = None
+    phone: Optional[str] = None
+    password_hash: Optional[str] = None
+
+class DepartmentCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    manager_id: Optional[int] = None
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    manager_id: Optional[int] = None
 
 class DeviceCreate(BaseModel):
     user_id: int
@@ -396,6 +408,9 @@ def update_user(id: int, req: UserUpdate, current_user: dict = Depends(get_curre
         if req.email is not None:
             updates.append("email = :e")
             params["e"] = req.email
+        if req.phone is not None:
+            updates.append("phone = :ph")
+            params["ph"] = req.phone
             
         # Các trường quản trị chỉ Admin mới được thay đổi
         if is_admin:
@@ -408,6 +423,9 @@ def update_user(id: int, req: UserUpdate, current_user: dict = Depends(get_curre
             if req.status is not None:
                 updates.append("status = :s")
                 params["s"] = req.status
+            if req.password_hash is not None:
+                updates.append("password_hash = :p")
+                params["p"] = req.password_hash
 
         if not updates:
             return {"message": "Không có thông tin nào cần thay đổi"}
@@ -448,15 +466,77 @@ def get_branches():
 @app.get("/api/departments")
 def get_departments(db: Session = Depends(get_db)):
     try:
-        query = text("SELECT department_id, name, description FROM Departments WHERE deleted_at IS NULL")
+        query = text("""
+            SELECT d.department_id, d.name, d.description, d.manager_id, u.full_name as manager_name,
+                   (SELECT COUNT(*) FROM Users u2 WHERE u2.department_id = d.department_id AND u2.deleted_at IS NULL) as member_count,
+                   (SELECT COUNT(*) FROM Devices dev WHERE dev.department_id = d.department_id AND dev.deleted_at IS NULL) as device_count
+            FROM Departments d
+            LEFT JOIN Users u ON d.manager_id = u.user_id
+            WHERE d.deleted_at IS NULL
+        """)
         rows = db.execute(query).fetchall()
-        return {"data": [{"department_id": r[0], "name": r[1], "description": r[2]} for r in rows]}
-    except Exception:
+        return {"data": [{
+            "department_id": r[0],
+            "name": r[1],
+            "description": r[2],
+            "manager_id": r[3],
+            "manager_name": r[4] or "Chưa chỉ định",
+            "member_count": r[5] or 0,
+            "device_count": r[6] or 0
+        } for r in rows]}
+    except Exception as e:
         return {"data": [
-            {"department_id": 1, "name": "Phòng Kỹ thuật & CNTT", "description": "Quản trị mạng & Hỗ trợ kỹ thuật"},
-            {"department_id": 2, "name": "Phòng Kế toán - Tài chính", "description": "Tài chính & Kế toán"},
-            {"department_id": 3, "name": "Phòng Kinh doanh & Tiếp thị", "description": "Bán hàng & Marketing"}
+            {"department_id": 1, "name": "Phòng Kỹ thuật & CNTT", "description": "Quản trị mạng & Hỗ trợ kỹ thuật", "member_count": 3, "device_count": 2},
+            {"department_id": 2, "name": "Phòng Kế toán - Tài chính", "description": "Tài chính & Kế toán", "member_count": 1, "device_count": 1},
+            {"department_id": 3, "name": "Phòng Kinh doanh & Tiếp thị", "description": "Bán hàng & Marketing", "member_count": 0, "device_count": 0}
         ]}
+
+@app.post("/api/departments")
+def create_department(req: DepartmentCreate, db: Session = Depends(get_db)):
+    try:
+        query = text("""
+            INSERT INTO Departments (name, description, manager_id)
+            VALUES (:name, :desc, :mgr)
+        """)
+        db.execute(query, {"name": req.name, "desc": req.description, "mgr": req.manager_id})
+        db.commit()
+        return {"message": "Tạo phòng ban thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/departments/{id}")
+def update_department(id: int, req: DepartmentUpdate, db: Session = Depends(get_db)):
+    try:
+        updates = []
+        params = {"id": id}
+        if req.name is not None:
+            updates.append("name = :name")
+            params["name"] = req.name
+        if req.description is not None:
+            updates.append("description = :desc")
+            params["desc"] = req.description
+        if req.manager_id is not None:
+            updates.append("manager_id = :mgr")
+            params["mgr"] = req.manager_id
+        if not updates:
+            return {"message": "Không có thông tin thay đổi"}
+        db.execute(text(f"UPDATE Departments SET {', '.join(updates)} WHERE department_id = :id"), params)
+        db.commit()
+        return {"message": f"Cập nhật phòng ban ID {id} thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/departments/{id}")
+def delete_department(id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("UPDATE Departments SET deleted_at = CURRENT_TIMESTAMP WHERE department_id = :id"), {"id": id})
+        db.commit()
+        return {"message": f"Đã xóa phòng ban ID {id}"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 # --- NHÓM 4: QUẢN LÝ THIẾT BỊ (DEVICE) ---
 
@@ -465,16 +545,24 @@ def get_devices(db: Session = Depends(get_db)):
     try:
         query = text("""
             SELECT d.device_id, d.device_name, d.rustdesk_id, d.ip_address, d.status, 
-                   d.user_id, u.full_name as owner_name, d.last_online
+                   d.user_id, u.full_name as owner_name, d.last_online,
+                   d.department_id, dep.name as department_name, d.device_type,
+                   d.mac_address, d.os_name, d.last_heartbeat
             FROM Devices d
             LEFT JOIN Users u ON d.user_id = u.user_id
+            LEFT JOIN Departments dep ON d.department_id = dep.department_id
             WHERE d.deleted_at IS NULL
         """)
         rows = db.execute(query).fetchall()
         return {"data": [{
             "device_id": r[0], "device_name": r[1], "rustdesk_id": r[2], "ip_address": r[3],
-            "status": r[4], "user_id": r[5], "owner_name": r[6], "last_online": str(r[7])
+            "status": r[4], "user_id": r[5], "user_name": r[6], "last_online": str(r[7]) if r[7] else None,
+            "department_id": r[8], "department_name": r[9], "device_type": r[10] or "desktop",
+            "mac_address": r[11], "os_name": r[12] or "Windows 11 Pro",
+            "last_heartbeat": str(r[13]) if r[13] else None
         } for r in rows]}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
     except Exception as e:
         return {"data": [], "error": str(e)}
 

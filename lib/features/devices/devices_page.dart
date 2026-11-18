@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
@@ -22,6 +23,34 @@ class _DevicesPageState extends State<DevicesPage> {
   String _departmentFilter = 'all';
   String _typeFilter = 'all';
   String _statusFilter = 'all';
+  Timer? _refreshTimer;
+  bool _isRefreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchDevices();
+      _refreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (mounted) _fetchDevices(isSilent: true);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchDevices({bool isSilent = false}) async {
+    if (!isSilent) setState(() => _isRefreshing = true);
+    final api = Provider.of<ApiService>(context, listen: false);
+    await api.getDevices();
+    if (mounted) {
+      setState(() => _isRefreshing = false);
+    }
+  }
 
   void _showAddDeviceDialog(BuildContext context) {
     final mock = MockDataService();
@@ -294,16 +323,36 @@ class _DevicesPageState extends State<DevicesPage> {
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showAddDeviceDialog(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Thêm Thiết Bị Mới'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.primaryBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _isRefreshing ? null : () => _fetchDevices(),
+                    icon: _isRefreshing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_rounded, size: 18),
+                    label: Text(_isRefreshing ? 'Đang đồng bộ...' : 'Làm Mới Trạng Thái'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () => _showAddDeviceDialog(context),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Thêm Thiết Bị Mới'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

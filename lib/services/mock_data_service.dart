@@ -111,9 +111,9 @@ class MockDataService {
         ipAddress: '10.13.13.3',
         macAddress: '00:0C:29:1A:2B:3C',
         osName: 'Ubuntu 24.04 LTS (VMware)',
-        status: 'online',
-        lastHeartbeat: DateTime.now().subtract(const Duration(seconds: 5)),
-        lastOnline: DateTime.now(),
+        status: 'offline',
+        lastHeartbeat: DateTime.now().subtract(const Duration(minutes: 15)),
+        lastOnline: DateTime.now().subtract(const Duration(minutes: 15)),
       ),
       DeviceModel(
         deviceId: 2,
@@ -127,9 +127,9 @@ class MockDataService {
         ipAddress: '10.13.13.2',
         macAddress: '74:40:BB:EA:B4:FB',
         osName: 'Windows 11 Pro 64-bit',
-        status: 'online',
-        lastHeartbeat: DateTime.now().subtract(const Duration(seconds: 2)),
-        lastOnline: DateTime.now(),
+        status: 'offline',
+        lastHeartbeat: DateTime.now().subtract(const Duration(hours: 1)),
+        lastOnline: DateTime.now().subtract(const Duration(hours: 1)),
       ),
     ];
 
