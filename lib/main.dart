@@ -44,7 +44,13 @@ class _VynexAppState extends State<VynexApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
-        ChangeNotifierProvider(create: (_) => ApiService()..checkHealth()),
+        ChangeNotifierProvider(
+          create: (_) => ApiService()
+            ..checkHealth()
+            ..getUsers()
+            ..getDepartments()
+            ..getDevices(),
+        ),
         ChangeNotifierProvider(create: (_) => PermissionService()),
         ChangeNotifierProvider(create: (_) => SupportTicketService()),
       ],

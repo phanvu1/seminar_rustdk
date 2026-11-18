@@ -388,51 +388,41 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
     );
   }
 
-  // --- TOGGLE STATUS (KHÓA / MỞ KHÓA) ---
+  // --- TOGGLE STATUS (KHÓA / MỞ KHÓA TÀI KHOẢN THEO CHUẨN AUDIT DOANH NGHIỆP) ---
   void _toggleUserStatus(UserModel user) async {
     final api = Provider.of<ApiService>(context, listen: false);
     final newStatus = user.status == 'active' ? 'inactive' : 'active';
+    
+    // Cập nhật ngay trên bộ nhớ cục bộ để UI phản hồi tức thì
+    final idx = MockDataService().users.indexWhere((u) => u.userId == user.userId);
+    if (idx != -1) {
+      final old = MockDataService().users[idx];
+      MockDataService().users[idx] = UserModel(
+        userId: old.userId,
+        username: old.username,
+        fullName: old.fullName,
+        role: old.role,
+        departmentId: old.departmentId,
+        departmentName: old.departmentName,
+        email: old.email,
+        phone: old.phone,
+        status: newStatus,
+        lastLogin: old.lastLogin,
+      );
+      setState(() {});
+    }
+
     await api.updateUser(user.userId, {'status': newStatus});
     if (!mounted) return;
     _fetchData();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(newStatus == 'active' ? 'Đã kích hoạt lại tài khoản @${user.username}' : 'Đã tạm khóa tài khoản @${user.username}')),
-    );
-  }
-
-  // --- CONFIRM XÓA NGƯỜI DÙNG ---
-  void _confirmDeleteUser(BuildContext context, UserModel user) {
-    if (user.role == UserRole.admin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể xóa tài khoản Quản trị viên tối cao (Admin)!')),
-      );
-      return;
-    }
-    final api = Provider.of<ApiService>(context, listen: false);
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Xác Nhận Xóa Người Dùng'),
-          content: Text('Bạn có chắc chắn muốn xóa tài khoản "${user.fullName}" (@${user.username}) khỏi hệ thống?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await api.deleteUser(user.userId);
-                if (!mounted) return;
-                _fetchData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Đã xóa người dùng "${user.fullName}" thành công!')),
-                );
-              },
-              child: const Text('Xác Nhận Xóa'),
-            ),
-          ],
-        );
-      },
+      SnackBar(
+        content: Text(
+          newStatus == 'active'
+              ? 'Đã kích hoạt lại tài khoản @${user.username}'
+              : 'Đã tạm khóa tài khoản @${user.username} (Bảo lưu dữ liệu kiểm toán)',
+        ),
+      ),
     );
   }
 
@@ -594,6 +584,20 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
                     final mgrName = selectedManagerId != null
                         ? mock.users.firstWhere((u) => u.userId == selectedManagerId).fullName
                         : null;
+                    final updatedDept = DepartmentModel(
+                      departmentId: dept.departmentId,
+                      name: nameController.text.trim(),
+                      description: descController.text.trim(),
+                      managerId: selectedManagerId,
+                      managerName: mgrName,
+                      memberCount: dept.memberCount,
+                      deviceCount: dept.deviceCount,
+                    );
+                    final idx = mock.departments.indexWhere((d) => d.departmentId == dept.departmentId);
+                    if (idx != -1) {
+                      mock.departments[idx] = updatedDept;
+                      setState(() {});
+                    }
                     await api.updateDepartment(dept.departmentId, {
                       'name': nameController.text.trim(),
                       'description': descController.text.trim(),
@@ -611,36 +615,6 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
               ],
             );
           },
-        );
-      },
-    );
-  }
-
-  // --- CONFIRM XÓA PHÒNG BAN ---
-  void _confirmDeleteDept(BuildContext context, DepartmentModel dept) {
-    final api = Provider.of<ApiService>(context, listen: false);
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Xác Nhận Xóa Phòng Ban'),
-          content: Text('Bạn có chắc muốn xóa "${dept.name}"? Các nhân viên thuộc phòng ban này sẽ được chuyển thành Chưa phân bổ.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await api.deleteDepartment(dept.departmentId);
-                if (!mounted) return;
-                _fetchData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Đã xóa phòng ban "${dept.name}"!')),
-                );
-              },
-              child: const Text('Xác Nhận Xóa'),
-            ),
-          ],
         );
       },
     );
@@ -936,14 +910,6 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
                                     splashRadius: 18,
                                   ),
                                 ),
-                                Tooltip(
-                                  message: 'Xóa tài khoản',
-                                  child: IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
-                                    onPressed: () => _confirmDeleteUser(context, u),
-                                    splashRadius: 18,
-                                  ),
-                                ),
                               ],
                             ),
                           ],
@@ -1021,14 +987,6 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
                                   child: IconButton(
                                     icon: const Icon(Icons.edit_outlined, size: 18),
                                     onPressed: () => _showEditDeptDialog(context, d),
-                                    splashRadius: 18,
-                                  ),
-                                ),
-                                Tooltip(
-                                  message: 'Xóa phòng ban',
-                                  child: IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
-                                    onPressed: () => _confirmDeleteDept(context, d),
                                     splashRadius: 18,
                                   ),
                                 ),

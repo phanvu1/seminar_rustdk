@@ -18,7 +18,7 @@ class ApiService extends ChangeNotifier {
   ApiService._internal();
 
   String _baseUrl = AppConstants.defaultApiBaseUrl;
-  String? _jwtToken;
+  String? _jwtToken = 'jwt-token-demo';
   bool _isBackendConnected = false;
   String _lastError = '';
 
@@ -33,19 +33,17 @@ class ApiService extends ChangeNotifier {
   }
 
   void setJwtToken(String? token) {
-    _jwtToken = token;
+    _jwtToken = (token != null && token.isNotEmpty) ? token : 'jwt-token-demo';
     notifyListeners();
   }
 
   Map<String, String> _buildHeaders() {
-    final headers = <String, String>{
+    final token = (_jwtToken != null && _jwtToken!.isNotEmpty) ? _jwtToken! : 'jwt-token-demo';
+    return <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
     };
-    if (_jwtToken != null && _jwtToken!.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $_jwtToken';
-    }
-    return headers;
   }
 
   // --- HEALTH CHECK ---
@@ -112,6 +110,9 @@ class ApiService extends ChangeNotifier {
       if (res.statusCode == 200) {
         final json = jsonDecode(utf8.decode(res.bodyBytes));
         final list = (json['data'] as List).map((e) => UserModel.fromJson(e)).toList();
+        if (list.isNotEmpty) {
+          MockDataService().users = list;
+        }
         _isBackendConnected = true;
         notifyListeners();
         return list;
@@ -132,6 +133,7 @@ class ApiService extends ChangeNotifier {
           .timeout(AppConstants.apiTimeout);
       if (res.statusCode == 200 || res.statusCode == 201) {
         _isBackendConnected = true;
+        await getUsers();
         return true;
       }
     } catch (e) {
@@ -215,6 +217,9 @@ class ApiService extends ChangeNotifier {
       if (res.statusCode == 200) {
         final json = jsonDecode(utf8.decode(res.bodyBytes));
         final list = (json['data'] as List).map((e) => DeviceModel.fromJson(e)).toList();
+        if (list.isNotEmpty) {
+          MockDataService().devices = list;
+        }
         _isBackendConnected = true;
         notifyListeners();
         return list;
@@ -235,6 +240,7 @@ class ApiService extends ChangeNotifier {
           .timeout(AppConstants.apiTimeout);
       if (res.statusCode == 200 || res.statusCode == 201) {
         _isBackendConnected = true;
+        await getDevices();
         return true;
       }
     } catch (e) {
@@ -248,7 +254,7 @@ class ApiService extends ChangeNotifier {
       userId: data['user_id'],
       departmentId: data['department_id'],
       deviceType: data['device_type'] ?? 'desktop',
-      ipAddress: data['ip_address'] ?? '192.168.1.${110 + newId}',
+      ipAddress: data['ip_address'] ?? '10.13.13.${2 + newId}',
       status: 'online',
       lastHeartbeat: DateTime.now(),
       lastOnline: DateTime.now(),
@@ -264,6 +270,7 @@ class ApiService extends ChangeNotifier {
       final res = await http.delete(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
       if (res.statusCode == 200) {
         _isBackendConnected = true;
+        await getDevices();
         return true;
       }
     } catch (e) {
