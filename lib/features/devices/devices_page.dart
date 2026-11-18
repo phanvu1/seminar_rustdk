@@ -60,7 +60,7 @@ class _DevicesPageState extends State<DevicesPage> {
     final vynexIdController = TextEditingController(
       text: '${100 + (DateTime.now().millisecond * 7) % 800} ${(DateTime.now().microsecond * 3) % 900} ${(DateTime.now().millisecond * 11) % 900}',
     );
-    final ipController = TextEditingController(text: '192.168.1.${120 + mock.devices.length}');
+    final ipController = TextEditingController(text: '10.13.13.${2 + mock.devices.length}');
     String selectedType = 'desktop';
     int selectedDept = mock.departments.first.departmentId;
     int selectedUser = mock.users.first.userId;
@@ -160,12 +160,14 @@ class _DevicesPageState extends State<DevicesPage> {
                       ),
                       const SizedBox(height: 14),
 
-                      const Text('Địa chỉ IP nội bộ:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Địa chỉ IP nội bộ (IP VPN WireGuard):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
                       TextField(
                         controller: ipController,
-                        decoration: const InputDecoration(
-                          hintText: '192.168.1.xxx',
+                        decoration: InputDecoration(
+                          hintText: '10.13.13.x (ví dụ: 10.13.13.4 cho peer3)',
+                          helperText: 'Nhập đúng IP trong file peer.conf của máy để hệ thống quét trạng thái Online/Offline',
+                          helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                           isDense: true,
                         ),
                       ),
