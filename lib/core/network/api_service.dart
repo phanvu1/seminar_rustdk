@@ -48,18 +48,28 @@ class ApiService extends ChangeNotifier {
 
   // --- HEALTH CHECK ---
   Future<bool> checkHealth() async {
-    try {
-      final uri = Uri.parse('$_baseUrl/');
-      final res = await http.get(uri).timeout(const Duration(seconds: 2));
-      if (res.statusCode == 200) {
-        _isBackendConnected = true;
-        _lastError = '';
-        notifyListeners();
-        return true;
+    final urlsToTry = <String>[
+      _baseUrl,
+      if (_baseUrl != AppConstants.publicApiBaseUrl) AppConstants.publicApiBaseUrl,
+      if (_baseUrl != AppConstants.vpnApiBaseUrl) AppConstants.vpnApiBaseUrl,
+    ];
+
+    for (final url in urlsToTry) {
+      try {
+        final uri = Uri.parse('$url/');
+        final res = await http.get(uri).timeout(const Duration(seconds: 2));
+        if (res.statusCode == 200) {
+          _baseUrl = url;
+          _isBackendConnected = true;
+          _lastError = '';
+          notifyListeners();
+          return true;
+        }
+      } catch (e) {
+        _lastError = e.toString();
       }
-    } catch (e) {
-      _lastError = e.toString();
     }
+
     _isBackendConnected = false;
     notifyListeners();
     return false;
@@ -70,51 +80,60 @@ class ApiService extends ChangeNotifier {
     final cleanU = username.trim().toLowerCase();
     final cleanP = password.trim();
 
-    try {
-      final uri = Uri.parse('$_baseUrl/api/auth/login');
-      final res = await http
-          .post(uri, headers: _buildHeaders(), body: jsonEncode({'username': cleanU, 'password': cleanP}))
-          .timeout(AppConstants.apiTimeout);
+    final urlsToTry = <String>[
+      _baseUrl,
+      if (_baseUrl != AppConstants.publicApiBaseUrl) AppConstants.publicApiBaseUrl,
+      if (_baseUrl != AppConstants.vpnApiBaseUrl) AppConstants.vpnApiBaseUrl,
+    ];
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(res.bodyBytes));
-        _isBackendConnected = true;
-        _jwtToken = data['token'] ?? 'jwt-vynex-token';
+    for (final url in urlsToTry) {
+      try {
+        final uri = Uri.parse('$url/api/auth/login');
+        final res = await http
+            .post(uri, headers: _buildHeaders(), body: jsonEncode({'username': cleanU, 'password': cleanP}))
+            .timeout(AppConstants.apiTimeout);
 
-        // Tải toàn bộ danh sách mới nhất từ DB
-        await getUsers();
-        await getDepartments();
-        await getDevices();
+        if (res.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          _baseUrl = url;
+          _isBackendConnected = true;
+          _jwtToken = data['token'] ?? 'jwt-vynex-token';
 
-        notifyListeners();
-        return {
-          'success': true,
-          'data': data,
-          'token': _jwtToken,
-          'user': data['user'],
-          'isFallback': false,
-        };
-      } else if (res.statusCode == 403) {
-        // Tài khoản bị khóa / ngừng kích hoạt -> CHẶN ĐĂNG NHẬP, BÁO LỖI
-        final data = jsonDecode(utf8.decode(res.bodyBytes));
-        return {
-          'success': false,
-          'isLocked': true,
-          'message': data['detail'] ?? 'Tài khoản này đang bị khóa. Vui lòng liên hệ Admin để mở khóa.',
-        };
-      } else if (res.statusCode == 401) {
-        final data = jsonDecode(utf8.decode(res.bodyBytes));
-        return {
-          'success': false,
-          'isLocked': false,
-          'message': data['detail'] ?? 'Sai tên đăng nhập hoặc mật khẩu.',
-        };
+          // Tải toàn bộ danh sách mới nhất từ DB
+          await getUsers();
+          await getDepartments();
+          await getDevices();
+
+          notifyListeners();
+          return {
+            'success': true,
+            'data': data,
+            'token': _jwtToken,
+            'user': data['user'],
+            'isFallback': false,
+          };
+        } else if (res.statusCode == 403) {
+          // Tài khoản bị khóa / ngừng kích hoạt -> CHẶN ĐĂNG NHẬP, BÁO LỖI
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          return {
+            'success': false,
+            'isLocked': true,
+            'message': data['detail'] ?? 'Tài khoản này đang bị khóa. Vui lòng liên hệ Admin để mở khóa.',
+          };
+        } else if (res.statusCode == 401) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          return {
+            'success': false,
+            'isLocked': false,
+            'message': data['detail'] ?? 'Sai tên đăng nhập hoặc mật khẩu.',
+          };
+        }
+      } catch (e) {
+        debugPrint('[ApiService] login network exception on $url: $e');
       }
-    } catch (e) {
-      debugPrint('[ApiService] login network exception: $e');
     }
 
-    // Nếu không kết nối được máy chủ VPN (10.13.13.1), kiểm tra bộ nhớ mock
+    // Nếu không kết nối được máy chủ VPN hoặc Public API, kiểm tra bộ nhớ mock
     // TUYỆT ĐỐI KHÔNG FALLBACK VỀ TÀI KHOẢN ADMIN NẾU KHÔNG PHẢI ADMIN!
     _isBackendConnected = false;
     notifyListeners();
@@ -157,7 +176,7 @@ class ApiService extends ChangeNotifier {
     return {
       'success': false,
       'isLocked': false,
-      'message': 'Không tìm thấy tài khoản \'$cleanU\' hoặc chưa kết nối WireGuard VPN (10.13.13.1).\nVui lòng kích hoạt WireGuard trên máy này và thử lại!',
+      'message': 'Không tìm thấy tài khoản \'$cleanU\' trên hệ thống.\nVui lòng kiểm tra lại tên đăng nhập hoặc liên hệ Quản trị viên.',
     };
   }
 

@@ -1,25 +1,20 @@
 @echo off
 chcp 65001 >nul
+title Vynex Enterprise Launcher
 echo ==========================================================
-echo    KHỞI CHẠY HỆ THỐNG VYNEX ENTERPRISE (WINDOWS)
+echo        HỆ THỐNG ĐIỀU KHIỂN ^& HỖ TRỢ TỪ XA VYNEX
 echo ==========================================================
+echo.
+echo   [1] Máy NHÂN VIÊN (Chỉ mở Vynex Client để nhận hỗ trợ IT)
+echo   [2] Máy QUẢN TRỊ / IT (Mở Bảng Điều Khiển Quản Trị ^& Hỗ Trợ)
+echo.
+echo ==========================================================
+set choice=1
+set /p choice="Nhập lựa chọn của bạn [1 hoặc 2] (Mặc định: 1): "
 
-set SCRIPT_DIR=%~dp0
-
-echo [1/2] Đang kiểm tra tiến trình nền Vynex Client Engine...
-tasklist /FI "IMAGENAME eq vynex.exe" 2>NUL | find /I /N "vynex.exe">NUL
-if "%ERRORLEVEL%"=="0" (
-    echo [+] Vynex Client Engine đang chạy sẵn sàng!
+if "%choice%"=="2" (
+    call "%~dp0Vynex_Quan_Tri_IT.bat"
 ) else (
-    echo [*] Đang khởi động Vynex Client Engine chạy ngầm...
-    start "" "%SCRIPT_DIR%Client\vynex.exe"
+    call "%~dp0Vynex_Nhan_Vien.bat"
 )
-
-echo [2/2] Đang khởi động Vynex Management Dashboard...
-start "" "%SCRIPT_DIR%Manager\vynex_manager.exe"
-
-echo ==========================================================
-echo    HỆ THỐNG ĐÃ SẴN SÀNG!
-echo ==========================================================
 exit
-

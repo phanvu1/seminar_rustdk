@@ -9,8 +9,14 @@ class AuthService extends ChangeNotifier {
   factory AuthService() => _instance;
   // Khởi tạo mặc định: Chưa đăng nhập để bắt buộc vào màn hình Login
   AuthService._internal() {
-    _currentUser = MockDataService().users.first;
-    _activeRole = _currentUser.role;
+    _currentUser = UserModel(
+      userId: 0,
+      username: '',
+      fullName: 'Chưa đăng nhập',
+      role: UserRole.employee,
+      status: 'inactive',
+    );
+    _activeRole = UserRole.employee;
     _isAuthenticated = false; // Luôn bắt buộc đăng nhập khi mở app
   }
 
@@ -28,7 +34,10 @@ class AuthService extends ChangeNotifier {
     if (preferUsername != null) {
       final found = MockDataService().users.firstWhere(
             (u) => u.username.toLowerCase() == preferUsername.toLowerCase(),
-            orElse: () => MockDataService().users.first,
+            orElse: () => MockDataService().users.firstWhere(
+              (u) => u.role == UserRole.employee,
+              orElse: () => MockDataService().users.last,
+            ),
           );
       _currentUser = found;
       _activeRole = found.role;

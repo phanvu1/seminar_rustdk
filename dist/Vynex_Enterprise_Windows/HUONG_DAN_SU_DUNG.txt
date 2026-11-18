@@ -1,0 +1,20 @@
+========================================================================
+       HƯỚNG DẪN SỬ DỤNG HỆ THỐNG VYNEX ENTERPRISE REMOTE DESKTOP
+========================================================================
+
+1. DÀNH CHO MÁY NHÂN VIÊN (CLIENT):
+   - Để nhận hỗ trợ điều khiển từ xa từ Kỹ thuật viên IT:
+     -> Chạy file: "Vynex_Nhan_Vien.bat"
+   - Cửa sổ Vynex Client sẽ hiện ID và Mật khẩu dùng một lần (One-Time Password).
+   - Đọc ID và Mật khẩu cho IT để IT kết nối vào hỗ trợ.
+
+2. DÀNH CHO MÁY QUẢN TRỊ VIÊN / KỸ THUẬT VIÊN IT:
+   - Để quản lý thiết bị, duyệt quyền truy cập và điều khiển máy nhân viên:
+     -> Chạy file: "Vynex_Quan_Tri_IT.bat"
+   - Hệ thống sẽ mở cả Vynex Client Engine và Bảng điều khiển Quản trị (Manager).
+   - Đăng nhập bằng tài khoản IT hoặc Admin được cấp.
+
+3. KHỞI CHẠY CHUNG:
+   - Bạn cũng có thể chạy file "run_vynex.bat" và chọn [1] hoặc [2] theo nhu cầu.
+
+========================================================================
