@@ -1,13 +1,13 @@
 #!/bin/bash
 # ==============================================================================
-# VYNEX CLIENT LINUX - UNIVERSAL INSTALLER (BỘ CÀI VẠN NĂNG)
-# Bản quyền: Đồ án Vynex Enterprise Remote Desktop
+# VYNEX CLIENT LINUX / UBUNTU - UNIVERSAL INSTALLER
+# Bản quyền: Hệ thống Điều khiển & Hỗ trợ Từ xa Vynex Enterprise
 # ==============================================================================
 
 set -e
 
 echo "=========================================================="
-echo "    BẮT ĐẦU CÀI ĐẶT & THIẾT LẬP VYNEX CLIENT (LINUX)      "
+echo "    BẮT ĐẦU CÀI ĐẶT & THIẾT LẬP VYNEX CLIENT (UBUNTU/LINUX) "
 echo "=========================================================="
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,16 +23,28 @@ done
 
 if [ -z "$CONF_FILE" ]; then
     echo "[-] CẢNH BÁO: Không tìm thấy file chứng chỉ (*.conf) nào trong thư mục cài đặt!"
-    echo "[-] Vui lòng copy file do Admin cấp (ví dụ: peer2.conf) vào cùng thư mục này rồi chạy lại."
+    echo "[-] Vui lòng copy file do Admin cấp (ví dụ: peer2.conf hoặc peer2_Employee_Ubuntu.conf) vào cùng thư mục này rồi chạy lại."
     exit 1
 fi
 
 echo "[+] Đã phát hiện chứng chỉ VPN được cấp: $(basename "$CONF_FILE")"
 
 # 2. Cài đặt các gói phụ thuộc
-echo "[1/4] Kiểm tra và cài đặt WireGuard VPN..."
+echo "[1/4] Kiểm tra và cài đặt WireGuard VPN & RustDesk..."
 sudo apt update -y
-sudo apt install -y wireguard curl
+sudo apt install -y wireguard curl wget
+
+# Tự động tải và cài đặt RustDesk nếu máy chưa có
+if ! command -v rustdesk &> /dev/null && [ ! -f "/usr/bin/rustdesk" ]; then
+    echo "[*] Đang tải gói cài đặt Vynex/RustDesk Linux (.deb)..."
+    DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.2.3-2/rustdesk-1.2.3-2-x86_64.deb"
+    wget -q --show-progress -O /tmp/rustdesk.deb "$DEB_URL" || \
+    curl -L -o /tmp/rustdesk.deb "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb"
+    
+    sudo apt install -y /tmp/rustdesk.deb || (sudo dpkg -i /tmp/rustdesk.deb && sudo apt-get install -f -y) || true
+    rm -f /tmp/rustdesk.deb
+    echo "[+] Đã cài đặt Vynex/RustDesk Engine thành công!"
+fi
 
 # 3. Kích hoạt hầm VPN
 echo "[2/4] Nạp chứng chỉ và kích hoạt hầm VPN bảo vệ..."
@@ -50,7 +62,7 @@ echo "[*] Trạng thái bắt tay VPN:"
 sudo wg show
 
 # 4. Tự động nhận diện thương hiệu Vynex trên Desktop
-echo "[3/4] Cập nhật nhận diện Vynex Client..."
+echo "[3/4] Cập nhật nhận diện Vynex Client trên Ubuntu..."
 RUSTDESK_DESKTOP="/usr/share/applications/rustdesk.desktop"
 if [ -f "$RUSTDESK_DESKTOP" ]; then
     sudo sed -i 's/^Name=.*/Name=Vynex Client/g' "$RUSTDESK_DESKTOP"
@@ -61,9 +73,9 @@ fi
 echo "[4/4] Tự động cấu hình máy chủ VPS Cloud & Public Key..."
 CONFIG_CONTENT="[options]
 custom-rendezvous-server = '10.13.13.1'
-key = 'NUvcbnr2VL3iLPCvmn2DjoZGMEtbQ27aEW1djMgev+M='
 relay-server = '10.13.13.1:21117'
-api-server = ''
+api-server = 'http://34.87.182.49:8000'
+key = 'NUvcbnr2VL3iLPCvmn2DjoZGMEtbQ27aEW1djMgev+M='
 allow-auto-disconnect = 'N'
 verification-method = 'both'"
 
@@ -79,9 +91,10 @@ echo "$CONFIG_CONTENT" > "$HOME/.config/rustdesk/RustDesk2.toml"
 sudo systemctl restart rustdesk 2>/dev/null || true
 
 echo "=========================================================="
-echo "    CÀI ĐẶT THÀNH CÔNG VYNEX CLIENT CHO NHÂN VIÊN!       "
+echo "    CÀI ĐẶT THÀNH CÔNG VYNEX CLIENT CHO UBUNTU LINUX!     "
 echo "  - Chứng chỉ đã nạp: $(basename "$CONF_FILE")            "
 echo "  - Máy chủ kết nối: VPS Cloud 10.13.13.1                  "
-echo "  - Phần mềm Vynex/RustDesk hiện đã sẵn sàng (Chấm xanh)   "
+echo "  - Relay Server: 10.13.13.1:21117                         "
+echo "  - API Server: http://34.87.182.49:8000                   "
+echo "  - Phần mềm Vynex Client hiện đã sẵn sàng (Chấm xanh)     "
 echo "=========================================================="
-

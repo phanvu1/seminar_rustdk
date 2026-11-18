@@ -1,20 +1,27 @@
-# HƯỚNG DẪN CẤP PHÁT THIẾT BỊ CHO NHÂN VIÊN LINUX / UBUNTU
+# HƯỚNG DẪN CÀI ĐẶT VYNEX CLIENT TRÊN UBUNTU / LINUX
 
-Thư mục `Vynex_Client_Linux` là **BỘ CÀI VẠN NĂNG (UNIVERSAL INSTALLER)** dùng chung cho toàn bộ nhân viên dùng Linux.
-Nó hoàn toàn KHÔNG chứa bất kỳ file cấu hình VPN cố định nào bên trong.
+Gói `Vynex_Enterprise_Linux_v2.0.tar.gz` là **BỘ CÀI VẠN NĂNG** cho nhân viên sử dụng hệ điều hành Ubuntu / Linux.
 
-### QUY TRÌNH CẤP PHÁT CHO NHÂN VIÊN MỚI:
+### CÁC BƯỚC THỰC HIỆN TRÊN MÁY UBUNTU:
 
-1. Admin copy thư mục `Vynex_Client_Linux` vào USB (hoặc gửi file nén cho nhân viên).
-2. Admin vào thư mục `Admin_VPN_Peers_Vault`, lấy **đúng 1 file cấu hình** của nhân viên đó (ví dụ: `peer2_Employee_Ubuntu.conf`), đổi tên thành `peer.conf` (hoặc giữ nguyên) và **thả vào cùng thư mục `Vynex_Client_Linux`**.
-3. Cắm USB vào máy nhân viên Ubuntu, mở Terminal tại thư mục đó và gõ:
+1. **Giải nén gói cài đặt:**
+   ```bash
+   tar -xvf Vynex_Enterprise_Linux_v2.0.tar.gz
+   cd Vynex_Client_Linux
+   ```
+
+2. **Copy file chứng chỉ WireGuard VPN (*.conf):**
+   - Lấy file chứng chỉ VPN do Admin cấp (ví dụ: `peer2_Employee_Ubuntu.conf` hoặc `peer2.conf`) đặt vào **cùng thư mục** với file `install.sh`.
+
+3. **Chạy script cài đặt:**
    ```bash
    chmod +x install.sh
    ./install.sh
    ```
-4. **Kết quả:** Script tự động:
-   - Phát hiện file `.conf` đặt cạnh nó.
-   - Cài đặt và bật WireGuard kết nối tới VPS Cloud `34.87.182.49`.
-   - Nạp cấu hình Server nội bộ `10.13.13.1` và Public Key `NUvcbnr2...`.
-   - Mở app Vynex lên là hiện **Chấm xanh (Ready)** ngay lập tức!
 
+4. **Kết quả:**
+   Script sẽ tự động:
+   - Cài đặt WireGuard VPN và tự động tải cài RustDesk Engine nếu máy chưa có.
+   - Kích hoạt hầm VPN an toàn kết nối tới VPS Cloud `34.87.182.49`.
+   - Cấu hình sẵn máy chủ nội bộ `10.13.13.1`, Relay `10.13.13.1:21117`, API `http://34.87.182.49:8000` và Public Key.
+   - Vynex Client sẽ hiện **Chấm xanh (Ready)** và sẵn sàng nhận hỗ trợ từ IT!
