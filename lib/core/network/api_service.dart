@@ -295,9 +295,7 @@ class ApiService extends ChangeNotifier {
       if (res.statusCode == 200) {
         final json = jsonDecode(utf8.decode(res.bodyBytes));
         final list = (json['data'] as List).map((e) => DeviceModel.fromJson(e)).toList();
-        if (list.isNotEmpty) {
-          MockDataService().devices = list;
-        }
+        MockDataService().devices = list;
         _isBackendConnected = true;
         notifyListeners();
         return list;
@@ -342,12 +340,41 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> updateDevice(int id, Map<String, dynamic> data) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/devices/$id');
+      final res = await http
+          .put(uri, headers: _buildHeaders(), body: jsonEncode(data))
+          .timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        await getDevices();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] updateDevice fallback due to: $e');
+    }
+    final idx = MockDataService().devices.indexWhere((d) => d.deviceId == id);
+    if (idx != -1) {
+      final old = MockDataService().devices[idx];
+      MockDataService().devices[idx] = old.copyWith(
+        name: data['device_name'] ?? old.name,
+        ipAddress: data['ip_address'] ?? old.ipAddress,
+        departmentId: data['department_id'] ?? old.departmentId,
+      );
+      notifyListeners();
+    }
+    return true;
+  }
+
   Future<bool> deleteDevice(int id) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/devices/$id');
       final res = await http.delete(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
       if (res.statusCode == 200) {
         _isBackendConnected = true;
+        MockDataService().devices.removeWhere((d) => d.deviceId == id);
+        notifyListeners();
         await getDevices();
         return true;
       }

@@ -556,12 +556,32 @@ def get_devices(db: Session = Depends(get_db)):
         } for r in rows]}
     except Exception as e:
         return {"data": [], "error": str(e)}
-    except Exception as e:
-        return {"data": [], "error": str(e)}
 
 @app.post("/api/devices")
 def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
     try:
+        # Kiểm tra xem rustdesk_id đã tồn tại trong DB chưa (kể cả đã bị xóa mềm)
+        existing = db.execute(
+            text("SELECT device_id, deleted_at FROM Devices WHERE rustdesk_id = :rid"),
+            {"rid": req.rustdesk_id}
+        ).fetchone()
+
+        if existing:
+            # Nếu thiết bị đã từng tồn tại: Cập nhật lại thông tin mới nhất và khôi phục hoạt động
+            dev_id = existing[0]
+            db.execute(text("""
+                UPDATE Devices 
+                SET user_id = :uid, device_name = :dname, ip_address = :ip, 
+                    department_id = :dept, device_type = :dtype, status = 'online', 
+                    deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE device_id = :did
+            """), {
+                "did": dev_id, "uid": req.user_id, "dname": req.device_name,
+                "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
+            })
+            db.commit()
+            return {"message": f"Cập nhật và kích hoạt thiết bị '{req.device_name}' (ID: {req.rustdesk_id}) thành công"}
+
         query = text("""
             INSERT INTO Devices (user_id, device_name, rustdesk_id, ip_address, department_id, device_type, status, last_online)
             VALUES (:uid, :dname, :rid, :ip, :dept, :dtype, 'online', CURRENT_TIMESTAMP)
@@ -572,6 +592,41 @@ def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
         })
         db.commit()
         return {"message": f"Thêm thiết bị '{req.device_name}' (ID: {req.rustdesk_id}) thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/devices/{id}")
+def update_device(id: int, req: DeviceCreate, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            UPDATE Devices 
+            SET user_id = :uid, device_name = :dname, rustdesk_id = :rid,
+                ip_address = :ip, department_id = :dept, device_type = :dtype,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE device_id = :did
+        """), {
+            "did": id, "uid": req.user_id, "dname": req.device_name,
+            "rid": req.rustdesk_id, "ip": req.ip_address, "dept": req.department_id,
+            "dtype": req.device_type
+        })
+        db.commit()
+        return {"message": f"Cập nhật thiết bị ID {id} thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/devices/{id}")
+def delete_device(id: int, db: Session = Depends(get_db)):
+    try:
+        dev = db.execute(text("SELECT device_id FROM Devices WHERE device_id = :id AND deleted_at IS NULL"), {"id": id}).fetchone()
+        if not dev:
+            raise HTTPException(status_code=404, detail="Thiết bị không tồn tại hoặc đã bị xóa")
+        db.execute(text("UPDATE Devices SET deleted_at = CURRENT_TIMESTAMP WHERE device_id = :id"), {"id": id})
+        db.commit()
+        return {"message": f"Đã xóa thiết bị ID {id} thành công"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))

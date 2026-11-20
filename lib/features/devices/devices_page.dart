@@ -52,18 +52,61 @@ class _DevicesPageState extends State<DevicesPage> {
     }
   }
 
-  void _showAddDeviceDialog(BuildContext context) {
-    final mock = MockDataService();
-    final api = Provider.of<ApiService>(context, listen: false);
+  String _formatIpWithPeer(String? ip) {
+    if (ip == null || ip.isEmpty) return 'N/A';
+    final trimmed = ip.trim();
+    final match = RegExp(r'^10\.13\.13\.(\d+)$').firstMatch(trimmed);
+    if (match != null) {
+      final octet = int.tryParse(match.group(1)!);
+      if (octet != null) {
+        if (octet == 1) return '$trimmed (Gateway / Server)';
+        return '$trimmed (Peer ${octet - 1})';
+      }
+    }
+    return trimmed;
+  }
 
+  Future<void> _showAddDeviceDialog(BuildContext context) async {
+    final api = Provider.of<ApiService>(context, listen: false);
+    // Đồng bộ danh sách người dùng và phòng ban mới nhất từ Server
+    await Future.wait([
+      api.getUsers(),
+      api.getDepartments(),
+      api.getDevices(),
+    ]);
+    if (!mounted) return;
+
+    final mock = MockDataService();
     final nameController = TextEditingController();
-    final vynexIdController = TextEditingController(
-      text: '${100 + (DateTime.now().millisecond * 7) % 800} ${(DateTime.now().microsecond * 3) % 900} ${(DateTime.now().millisecond * 11) % 900}',
-    );
-    final ipController = TextEditingController(text: '10.13.13.${2 + mock.devices.length}');
+    final vynexIdController = TextEditingController();
+
+    final peerList = <Map<String, String>>[
+      for (int i = 1; i <= 20; i++)
+        {
+          'id': 'peer$i',
+          'label': 'Peer $i (10.13.13.${i + 1})${i == 1 ? " - Admin" : (i == 7 ? " - Máy Gia Bảo" : "")}',
+          'ip': '10.13.13.${i + 1}',
+        },
+      {'id': 'custom', 'label': 'Nhập IP tùy chỉnh khác...', 'ip': ''},
+    ];
+
+    // Mặc định chọn Peer 7 (10.13.13.8) nếu có nhân viên mới
+    String selectedPeer = 'peer7';
+    final ipController = TextEditingController(text: '10.13.13.8');
+
     String selectedType = 'desktop';
-    int selectedDept = mock.departments.first.departmentId;
-    int selectedUser = mock.users.first.userId;
+
+    // Ưu tiên chọn nhân viên mới nhất (không phải Admin)
+    final nonAdmins = mock.users.where((u) => u.userId != 1).toList();
+    int selectedUser = nonAdmins.isNotEmpty
+        ? nonAdmins.last.userId
+        : (mock.users.isNotEmpty ? mock.users.first.userId : 1);
+
+    final initialUser = mock.users.firstWhere(
+      (u) => u.userId == selectedUser,
+      orElse: () => mock.users.first,
+    );
+    int selectedDept = initialUser.departmentId ?? (mock.departments.isNotEmpty ? mock.departments.first.departmentId : 1);
 
     showDialog(
       context: context,
@@ -81,7 +124,7 @@ class _DevicesPageState extends State<DevicesPage> {
                 ],
               ),
               content: SizedBox(
-                width: 500,
+                width: 520,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -92,18 +135,39 @@ class _DevicesPageState extends State<DevicesPage> {
                       TextField(
                         controller: nameController,
                         decoration: const InputDecoration(
-                          hintText: 'Ví dụ: PC-KE-TOAN-05 (Máy kế toán Linh)',
+                          hintText: 'Ví dụ: Máy của Bảo (Kế toán)',
                           isDense: true,
                         ),
                       ),
                       const SizedBox(height: 14),
 
-                      const Text('Vynex ID (Mã kết nối RustDesk/Vynex):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Vynex ID (Mã kết nối RustDesk/Vynex):',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setDialogState(() {
+                                vynexIdController.text =
+                                    '${100 + (DateTime.now().millisecond * 7) % 800} ${(DateTime.now().microsecond * 3) % 900} ${(DateTime.now().millisecond * 11) % 900}';
+                              });
+                            },
+                            icon: const Icon(Icons.refresh, size: 14),
+                            label: const Text('Tạo ID mẫu', style: TextStyle(fontSize: 11)),
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: vynexIdController,
                         decoration: const InputDecoration(
-                          hintText: '9 chữ số, ví dụ: 948 201 543',
+                          hintText: '9 chữ số hiển thị trên máy đối tác (ví dụ: 93 643 131)',
                           isDense: true,
                         ),
                       ),
@@ -160,16 +224,45 @@ class _DevicesPageState extends State<DevicesPage> {
                       ),
                       const SizedBox(height: 14),
 
-                      const Text('Địa chỉ IP nội bộ (IP VPN WireGuard):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Gán WireGuard Peer / IP VPN:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedPeer,
+                        isExpanded: true,
+                        decoration: const InputDecoration(isDense: true),
+                        items: peerList.map((p) {
+                          return DropdownMenuItem<String>(
+                            value: p['id']!,
+                            child: Text(p['label']!, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDialogState(() {
+                              selectedPeer = v;
+                              if (v != 'custom') {
+                                final found = peerList.firstWhere((p) => p['id'] == v);
+                                ipController.text = found['ip']!;
+                              }
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: ipController,
                         decoration: InputDecoration(
-                          hintText: '10.13.13.x (ví dụ: 10.13.13.4 cho peer3)',
-                          helperText: 'Nhập đúng IP trong file peer.conf của máy để hệ thống quét trạng thái Online/Offline',
+                          hintText: '10.13.13.x (ví dụ: 10.13.13.8 cho Peer 7)',
+                          helperText: 'Hệ thống dùng IP này để quét trạng thái và thiết lập kết nối VPN',
                           helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                           isDense: true,
                         ),
+                        onChanged: (val) {
+                          final match = peerList.firstWhere((p) => p['ip'] == val.trim(), orElse: () => {'id': 'custom'});
+                          if (match['id'] != selectedPeer) {
+                            setDialogState(() => selectedPeer = match['id']!);
+                          }
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -182,11 +275,25 @@ class _DevicesPageState extends State<DevicesPage> {
                         items: mock.users.map((u) {
                           return DropdownMenuItem<int>(
                             value: u.userId,
-                            child: Text('${u.fullName} (@${u.username})'),
+                            child: Text(
+                              '${u.fullName} (@${u.username})${u.userId == 1 ? " [ADMIN]" : ""}',
+                              style: TextStyle(
+                                fontWeight: u.userId == 1 ? FontWeight.bold : FontWeight.normal,
+                                color: u.userId == 1 ? const Color(0xFFEF4444) : null,
+                              ),
+                            ),
                           );
                         }).toList(),
                         onChanged: (v) {
-                          if (v != null) setDialogState(() => selectedUser = v);
+                          if (v != null) {
+                            setDialogState(() {
+                              selectedUser = v;
+                              final u = mock.users.firstWhere((user) => user.userId == v, orElse: () => mock.users.first);
+                              if (u.departmentId != null) {
+                                selectedDept = u.departmentId!;
+                              }
+                            });
+                          }
                         },
                       ),
                     ],
@@ -214,7 +321,7 @@ class _DevicesPageState extends State<DevicesPage> {
                     setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Đã thêm thiết bị mới thành công!'),
+                        content: Text('Đã lưu và kích hoạt thiết bị thành công!'),
                         backgroundColor: Color(0xFF10B981),
                       ),
                     );
@@ -224,6 +331,245 @@ class _DevicesPageState extends State<DevicesPage> {
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Thêm Thiết Bị'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showEditDeviceDialog(BuildContext context, DeviceModel device) async {
+    final api = Provider.of<ApiService>(context, listen: false);
+    await Future.wait([
+      api.getUsers(),
+      api.getDepartments(),
+    ]);
+    if (!mounted) return;
+
+    final mock = MockDataService();
+    final nameController = TextEditingController(text: device.name);
+    final vynexIdController = TextEditingController(text: device.vynexId);
+    final ipController = TextEditingController(text: device.ipAddress ?? '');
+    String selectedType = device.deviceType;
+    int selectedDept = device.departmentId ?? (mock.departments.isNotEmpty ? mock.departments.first.departmentId : 1);
+    int selectedUser = device.userId ?? (mock.users.isNotEmpty ? mock.users.first.userId : 1);
+
+    final peerList = <Map<String, String>>[
+      for (int i = 1; i <= 20; i++)
+        {
+          'id': 'peer$i',
+          'label': 'Peer $i (10.13.13.${i + 1})${i == 1 ? " - Admin" : (i == 7 ? " - Máy Gia Bảo" : "")}',
+          'ip': '10.13.13.${i + 1}',
+        },
+      {'id': 'custom', 'label': 'Nhập IP tùy chỉnh khác...', 'ip': ''},
+    ];
+
+    String selectedPeer = 'custom';
+    for (final p in peerList) {
+      if (p['ip'] == (device.ipAddress ?? '').trim()) {
+        selectedPeer = p['id']!;
+        break;
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              title: const Row(
+                children: [
+                  Icon(Icons.edit_note_rounded, color: AppConstants.primaryBlue),
+                  SizedBox(width: 10),
+                  Text('Chỉnh Sửa Thông Tin Thiết Bị'),
+                ],
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Tên thiết bị:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(isDense: true),
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text('Vynex ID (Mã kết nối RustDesk/Vynex):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: vynexIdController,
+                        decoration: const InputDecoration(isDense: true),
+                      ),
+                      const SizedBox(height: 14),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Loại máy:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<String>(
+                                  value: selectedType,
+                                  decoration: const InputDecoration(isDense: true),
+                                  items: const [
+                                    DropdownMenuItem(value: 'desktop', child: Text('Desktop (Máy bàn)')),
+                                    DropdownMenuItem(value: 'laptop', child: Text('Laptop (Máy xách tay)')),
+                                    DropdownMenuItem(value: 'server', child: Text('Server (Máy chủ)')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) setDialogState(() => selectedType = v);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Phòng ban:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<int>(
+                                  value: selectedDept,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(isDense: true),
+                                  items: mock.departments.map((d) {
+                                    return DropdownMenuItem<int>(
+                                      value: d.departmentId,
+                                      child: Text(d.name, overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) {
+                                    if (v != null) setDialogState(() => selectedDept = v);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text('Gán WireGuard Peer / IP VPN:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedPeer,
+                        isExpanded: true,
+                        decoration: const InputDecoration(isDense: true),
+                        items: peerList.map((p) {
+                          return DropdownMenuItem<String>(
+                            value: p['id']!,
+                            child: Text(p['label']!, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDialogState(() {
+                              selectedPeer = v;
+                              if (v != 'custom') {
+                                final found = peerList.firstWhere((p) => p['id'] == v);
+                                ipController.text = found['ip']!;
+                              }
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: ipController,
+                        decoration: InputDecoration(
+                          hintText: '10.13.13.x',
+                          helperText: 'Cập nhật IP theo đúng file WireGuard của máy đối tác',
+                          helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          isDense: true,
+                        ),
+                        onChanged: (val) {
+                          final match = peerList.firstWhere((p) => p['ip'] == val.trim(), orElse: () => {'id': 'custom'});
+                          if (match['id'] != selectedPeer) {
+                            setDialogState(() => selectedPeer = match['id']!);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text('Gán cho nhân viên sử dụng:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<int>(
+                        value: selectedUser,
+                        isExpanded: true,
+                        decoration: const InputDecoration(isDense: true),
+                        items: mock.users.map((u) {
+                          return DropdownMenuItem<int>(
+                            value: u.userId,
+                            child: Text(
+                              '${u.fullName} (@${u.username})${u.userId == 1 ? " [ADMIN]" : ""}',
+                              style: TextStyle(
+                                fontWeight: u.userId == 1 ? FontWeight.bold : FontWeight.normal,
+                                color: u.userId == 1 ? const Color(0xFFEF4444) : null,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDialogState(() {
+                              selectedUser = v;
+                              final u = mock.users.firstWhere((user) => user.userId == v, orElse: () => mock.users.first);
+                              if (u.departmentId != null) {
+                                selectedDept = u.departmentId!;
+                              }
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty) return;
+                    await api.updateDevice(device.deviceId, {
+                      'device_name': nameController.text.trim(),
+                      'rustdesk_id': vynexIdController.text.trim(),
+                      'user_id': selectedUser,
+                      'department_id': selectedDept,
+                      'device_type': selectedType,
+                      'ip_address': ipController.text.trim(),
+                    });
+                    if (!mounted) return;
+                    Navigator.pop(ctx);
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã cập nhật thông tin thiết bị thành công!'),
+                        backgroundColor: Color(0xFF10B981),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Lưu Thay Đổi'),
                 ),
               ],
             );
@@ -485,7 +831,7 @@ class _DevicesPageState extends State<DevicesPage> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'Vynex ID: ${dev.vynexId}  •  IP: ${dev.ipAddress ?? "N/A"}  •  OS: ${dev.osName ?? "Windows"}',
+                              'Vynex ID: ${dev.vynexId}  •  IP: ${_formatIpWithPeer(dev.ipAddress)}  •  OS: ${dev.osName ?? "Windows"}',
                               style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                             ),
                           ],
@@ -701,6 +1047,11 @@ class _DevicesPageState extends State<DevicesPage> {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.edit_note_rounded, color: AppConstants.primaryBlue, size: 20),
+                                tooltip: 'Chỉnh sửa thông tin thiết bị',
+                                onPressed: () => _showEditDeviceDialog(context, dev),
+                              ),
                               IconButton(
                                 icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
                                 tooltip: 'Xóa thiết bị',
