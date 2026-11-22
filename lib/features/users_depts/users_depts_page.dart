@@ -57,7 +57,7 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
     final fullNameController = TextEditingController();
     final emailController = TextEditingController();
     final phoneController = TextEditingController();
-    UserRole selectedRole = UserRole.employee;
+    UserRole selectedRole = UserRole.it;
     int selectedDept = mock.departments.isNotEmpty ? mock.departments.first.departmentId : 1;
 
     showDialog(
@@ -701,6 +701,7 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mock = MockDataService();
+    final api = Provider.of<ApiService>(context, listen: false);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -838,22 +839,96 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
                                     children: [
                                       Text(u.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                       const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: u.role == UserRole.admin
-                                              ? const Color(0xFFEDE9FE)
-                                              : (u.role == UserRole.it ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9)),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          u.role.displayName,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
+                                      PopupMenuButton<UserRole>(
+                                        tooltip: 'Nhấp để đổi vai trò nhanh',
+                                        initialValue: u.role,
+                                        onSelected: (newRole) async {
+                                          if (newRole == u.role) return;
+                                          final ok = await api.updateUser(u.userId, {'role_id': newRole.roleId});
+                                          if (ok) {
+                                            final idx = mock.users.indexWhere((user) => user.userId == u.userId);
+                                            if (idx != -1) {
+                                              mock.users[idx] = mock.users[idx].copyWith(role: newRole);
+                                            }
+                                            setState(() {});
+                                            _fetchData();
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Đã cập nhật vai trò của @${u.username} thành: ${newRole.displayName}'),
+                                                  backgroundColor: const Color(0xFF10B981),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem(
+                                            value: UserRole.admin,
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.shield_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                                                SizedBox(width: 8),
+                                                Text('Quản trị viên (Admin)'),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: UserRole.it,
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.support_agent_rounded, size: 16, color: Color(0xFF0284C7)),
+                                                SizedBox(width: 8),
+                                                Text('Kỹ thuật viên (IT Support)'),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: UserRole.employee,
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.person_rounded, size: 16, color: Color(0xFF64748B)),
+                                                SizedBox(width: 8),
+                                                Text('Nhân viên (Employee)'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
                                             color: u.role == UserRole.admin
-                                              ? const Color(0xFF6D28D9)
-                                              : (u.role == UserRole.it ? const Color(0xFF0284C7) : const Color(0xFF475569)),
+                                                ? const Color(0xFFEDE9FE)
+                                                : (u.role == UserRole.it ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9)),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: u.role == UserRole.admin
+                                                  ? const Color(0xFFC4B5FD)
+                                                  : (u.role == UserRole.it ? const Color(0xFFBAE6FD) : const Color(0xFFCBD5E1)),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                u.role.displayName,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: u.role == UserRole.admin
+                                                      ? const Color(0xFF6D28D9)
+                                                      : (u.role == UserRole.it ? const Color(0xFF0284C7) : const Color(0xFF475569)),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Icon(
+                                                Icons.arrow_drop_down,
+                                                size: 14,
+                                                color: u.role == UserRole.admin
+                                                    ? const Color(0xFF6D28D9)
+                                                    : (u.role == UserRole.it ? const Color(0xFF0284C7) : const Color(0xFF475569)),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),

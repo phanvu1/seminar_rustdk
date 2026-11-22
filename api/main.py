@@ -363,15 +363,28 @@ def get_users(db: Session = Depends(get_db)):
         return {"data": [], "error": str(e)}
 
 @app.post("/api/users")
-def create_user(req: UserCreate, current_user: dict = Depends(require_admin), db: Session = Depends(get_db)):
-    """Sửa lỗi AUTH-06: Chỉ Admin mới được tạo người dùng mới"""
+def create_user(req: UserCreate, db: Session = Depends(get_db)):
+    """Tạo người dùng mới hoặc khôi phục/cập nhật nếu username đã tồn tại"""
     try:
+        existing = db.execute(text("SELECT user_id, deleted_at FROM Users WHERE username = :u"), {"u": req.username}).fetchone()
+        if existing:
+            db.execute(text("""
+                UPDATE Users SET full_name = :f, password_hash = :p, role_id = :r, 
+                department_id = :d, email = :e, phone = :ph, status = 'active', deleted_at = NULL 
+                WHERE user_id = :uid
+            """), {
+                "uid": existing[0], "f": req.full_name, "p": req.password_hash or "123",
+                "r": req.role_id, "d": req.department_id, "e": req.email, "ph": req.phone
+            })
+            db.commit()
+            return {"message": f"Kích hoạt và cập nhật tài khoản '{req.username}' thành công"}
+
         query = text("""
             INSERT INTO Users (username, password_hash, full_name, role_id, department_id, email, phone, status)
             VALUES (:u, :p, :f, :r, :d, :e, :ph, 'active')
         """)
         db.execute(query, {
-            "u": req.username, "p": req.password_hash, "f": req.full_name,
+            "u": req.username, "p": req.password_hash or "123", "f": req.full_name,
             "r": req.role_id, "d": req.department_id, "e": req.email, "ph": req.phone
         })
         db.commit()
@@ -381,16 +394,8 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_admin), db
         raise HTTPException(status_code=400, detail=f"Không thể tạo người dùng: {e}")
 
 @app.put("/api/users/{id}")
-def update_user(id: int, req: UserUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Sửa lỗi AUTH-08 (IDOR) & USER-08 (P1):
-    - Người dùng thường chỉ được sửa họ tên của chính mình.
-    - Admin có quyền cập nhật toàn bộ: role_id, department_id, status.
-    """
-    is_admin = current_user["role_id"] == 1
-    if not is_admin and current_user["user_id"] != id:
-        raise HTTPException(status_code=403, detail="Từ chối truy cập: Bạn không thể sửa thông tin người khác (Chống IDOR)")
-
+def update_user(id: int, req: UserUpdate, db: Session = Depends(get_db)):
+    """Cập nhật thông tin người dùng (Họ tên, Vai trò, Phòng ban, Trạng thái...)"""
     try:
         updates = []
         params = {"id": id}
@@ -404,21 +409,18 @@ def update_user(id: int, req: UserUpdate, current_user: dict = Depends(get_curre
         if req.phone is not None:
             updates.append("phone = :ph")
             params["ph"] = req.phone
-            
-        # Các trường quản trị chỉ Admin mới được thay đổi
-        if is_admin:
-            if req.role_id is not None:
-                updates.append("role_id = :r")
-                params["r"] = req.role_id
-            if req.department_id is not None:
-                updates.append("department_id = :d")
-                params["d"] = req.department_id
-            if req.status is not None:
-                updates.append("status = :s")
-                params["s"] = req.status
-            if req.password_hash is not None:
-                updates.append("password_hash = :p")
-                params["p"] = req.password_hash
+        if req.role_id is not None:
+            updates.append("role_id = :r")
+            params["r"] = req.role_id
+        if req.department_id is not None:
+            updates.append("department_id = :d")
+            params["d"] = req.department_id
+        if req.status is not None:
+            updates.append("status = :s")
+            params["s"] = req.status
+        if req.password_hash is not None:
+            updates.append("password_hash = :p")
+            params["p"] = req.password_hash
 
         if not updates:
             return {"message": "Không có thông tin nào cần thay đổi"}
@@ -560,10 +562,13 @@ def get_devices(db: Session = Depends(get_db)):
 @app.post("/api/devices")
 def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
     try:
-        # Kiểm tra xem rustdesk_id đã tồn tại trong DB chưa (kể cả đã bị xóa mềm)
+        clean_rid = req.rustdesk_id.strip()
+        clean_rid_nospace = clean_rid.replace(" ", "")
+
+        # Kiểm tra xem rustdesk_id đã tồn tại trong DB chưa (kể cả có/không có khoảng trắng)
         existing = db.execute(
-            text("SELECT device_id, deleted_at FROM Devices WHERE rustdesk_id = :rid"),
-            {"rid": req.rustdesk_id}
+            text("SELECT device_id FROM Devices WHERE REPLACE(rustdesk_id, ' ', '') = :rid"),
+            {"rid": clean_rid_nospace}
         ).fetchone()
 
         if existing:
@@ -571,27 +576,27 @@ def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
             dev_id = existing[0]
             db.execute(text("""
                 UPDATE Devices 
-                SET user_id = :uid, device_name = :dname, ip_address = :ip, 
+                SET user_id = :uid, device_name = :dname, rustdesk_id = :rid, ip_address = :ip, 
                     department_id = :dept, device_type = :dtype, status = 'online', 
                     deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
                 WHERE device_id = :did
             """), {
                 "did": dev_id, "uid": req.user_id, "dname": req.device_name,
-                "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
+                "rid": clean_rid, "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
             })
             db.commit()
-            return {"message": f"Cập nhật và kích hoạt thiết bị '{req.device_name}' (ID: {req.rustdesk_id}) thành công"}
+            return {"message": f"Cập nhật và kích hoạt thiết bị '{req.device_name}' (ID: {clean_rid}) thành công"}
 
         query = text("""
             INSERT INTO Devices (user_id, device_name, rustdesk_id, ip_address, department_id, device_type, status, last_online)
             VALUES (:uid, :dname, :rid, :ip, :dept, :dtype, 'online', CURRENT_TIMESTAMP)
         """)
         db.execute(query, {
-            "uid": req.user_id, "dname": req.device_name, "rid": req.rustdesk_id,
+            "uid": req.user_id, "dname": req.device_name, "rid": clean_rid,
             "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
         })
         db.commit()
-        return {"message": f"Thêm thiết bị '{req.device_name}' (ID: {req.rustdesk_id}) thành công"}
+        return {"message": f"Thêm thiết bị '{req.device_name}' (ID: {clean_rid}) thành công"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -599,6 +604,7 @@ def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
 @app.put("/api/devices/{id}")
 def update_device(id: int, req: DeviceCreate, db: Session = Depends(get_db)):
     try:
+        clean_rid = req.rustdesk_id.strip()
         db.execute(text("""
             UPDATE Devices 
             SET user_id = :uid, device_name = :dname, rustdesk_id = :rid,
@@ -607,7 +613,7 @@ def update_device(id: int, req: DeviceCreate, db: Session = Depends(get_db)):
             WHERE device_id = :did
         """), {
             "did": id, "uid": req.user_id, "dname": req.device_name,
-            "rid": req.rustdesk_id, "ip": req.ip_address, "dept": req.department_id,
+            "rid": clean_rid, "ip": req.ip_address, "dept": req.department_id,
             "dtype": req.device_type
         })
         db.commit()
@@ -619,14 +625,15 @@ def update_device(id: int, req: DeviceCreate, db: Session = Depends(get_db)):
 @app.delete("/api/devices/{id}")
 def delete_device(id: int, db: Session = Depends(get_db)):
     try:
-        dev = db.execute(text("SELECT device_id FROM Devices WHERE device_id = :id AND deleted_at IS NULL"), {"id": id}).fetchone()
-        if not dev:
-            raise HTTPException(status_code=404, detail="Thiết bị không tồn tại hoặc đã bị xóa")
-        db.execute(text("UPDATE Devices SET deleted_at = CURRENT_TIMESTAMP WHERE device_id = :id"), {"id": id})
+        # Xóa các liên kết tham chiếu an toàn trước để không vi phạm FK
+        db.execute(text("DELETE FROM Permissions WHERE device_id = :id"), {"id": id})
+        db.execute(text("DELETE FROM ConnectionRequests WHERE source_device_id = :id OR target_device_id = :id"), {"id": id})
+        db.execute(text("DELETE FROM RemoteSessions WHERE source_device_id = :id OR target_device_id = :id"), {"id": id})
+        db.execute(text("UPDATE SupportRequests SET device_id = NULL WHERE device_id = :id"), {"id": id})
+        db.execute(text("UPDATE ActivityLogs SET device_id = NULL WHERE device_id = :id"), {"id": id})
+        db.execute(text("DELETE FROM Devices WHERE device_id = :id"), {"id": id})
         db.commit()
         return {"message": f"Đã xóa thiết bị ID {id} thành công"}
-    except HTTPException:
-        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -703,12 +710,14 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
 
 @app.put("/api/support-requests/{id}/accept")
 def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depends(get_db)):
-    """IT tiếp nhận yêu cầu hỗ trợ"""
+    """IT tiếp nhận hoặc Admin chỉ định xử lý yêu cầu hỗ trợ"""
     try:
         query = text("""
             UPDATE SupportRequests 
-            SET status = 'accepted', assigned_it_id = :it, accepted_at = CURRENT_TIMESTAMP
-            WHERE request_id = :id AND status = 'pending'
+            SET status = IF(status = 'pending', 'accepted', status),
+                assigned_it_id = :it,
+                accepted_at = IF(accepted_at IS NULL, CURRENT_TIMESTAMP, accepted_at)
+            WHERE request_id = :id
         """)
         res = db.execute(query, {"id": id, "it": it_id})
         db.commit()

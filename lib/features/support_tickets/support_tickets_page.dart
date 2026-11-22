@@ -814,10 +814,28 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                                     );
                                   },
                                   itemBuilder: (ctx) {
-                                    final itUsers = MockDataService().users.where((u) => u.role == UserRole.it).toList();
+                                    final itUsers = MockDataService().users.where((u) => u.role == UserRole.it || u.role == UserRole.admin).toList();
+                                    if (itUsers.isEmpty) {
+                                      return [
+                                        const PopupMenuItem(
+                                          enabled: false,
+                                          child: Text('Chưa có nhân viên IT nào trong hệ thống!'),
+                                        ),
+                                      ];
+                                    }
                                     return itUsers.map((itStaff) => PopupMenuItem(
                                       value: itStaff,
-                                      child: Text('Chỉ định: ${itStaff.fullName}'),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            itStaff.role == UserRole.admin ? Icons.shield_rounded : Icons.support_agent_rounded,
+                                            size: 16,
+                                            color: itStaff.role == UserRole.admin ? Colors.purple : AppConstants.primaryBlue,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text('Chỉ định: ${itStaff.fullName} (${itStaff.role.shortName})'),
+                                        ],
+                                      ),
                                     )).toList();
                                   },
                                   child: Container(

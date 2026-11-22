@@ -318,7 +318,7 @@ Trong tệp `server/compose.yml`, nhóm đã nâng cấp cấu hình container W
     restart: unless-stopped
     networks:
       rustdesk-net:
-        ipv4_address: 10.13.13.1                    # Cổng Gateway VPN trung tâm
+        ipv4_address:                     # Cổng Gateway VPN trung tâm
 ```
 
 Bảng phân bổ địa chỉ IP mạng VPN nội bộ:

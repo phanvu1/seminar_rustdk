@@ -80,18 +80,8 @@ class _DevicesPageState extends State<DevicesPage> {
     final nameController = TextEditingController();
     final vynexIdController = TextEditingController();
 
-    final peerList = <Map<String, String>>[
-      for (int i = 1; i <= 20; i++)
-        {
-          'id': 'peer$i',
-          'label': 'Peer $i (10.13.13.${i + 1})${i == 1 ? " - Admin" : (i == 7 ? " - Máy Gia Bảo" : "")}',
-          'ip': '10.13.13.${i + 1}',
-        },
-      {'id': 'custom', 'label': 'Nhập IP tùy chỉnh khác...', 'ip': ''},
-    ];
-
-    // Mặc định chọn Peer 7 (10.13.13.8) nếu có nhân viên mới
-    String selectedPeer = 'peer7';
+    // Cho phép nhập tay số Peer tự do không giới hạn, tự động khớp với IP 10.13.13.x
+    final peerController = TextEditingController(text: '7');
     final ipController = TextEditingController(text: '10.13.13.8');
 
     String selectedType = 'desktop';
@@ -224,45 +214,63 @@ class _DevicesPageState extends State<DevicesPage> {
                       ),
                       const SizedBox(height: 14),
 
-                      const Text('Gán WireGuard Peer / IP VPN:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        value: selectedPeer,
-                        isExpanded: true,
-                        decoration: const InputDecoration(isDense: true),
-                        items: peerList.map((p) {
-                          return DropdownMenuItem<String>(
-                            value: p['id']!,
-                            child: Text(p['label']!, overflow: TextOverflow.ellipsis),
-                          );
-                        }).toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setDialogState(() {
-                              selectedPeer = v;
-                              if (v != 'custom') {
-                                final found = peerList.firstWhere((p) => p['id'] == v);
-                                ipController.text = found['ip']!;
-                              }
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: ipController,
-                        decoration: InputDecoration(
-                          hintText: '10.13.13.x (ví dụ: 10.13.13.8 cho Peer 7)',
-                          helperText: 'Hệ thống dùng IP này để quét trạng thái và thiết lập kết nối VPN',
-                          helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                          isDense: true,
-                        ),
-                        onChanged: (val) {
-                          final match = peerList.firstWhere((p) => p['ip'] == val.trim(), orElse: () => {'id': 'custom'});
-                          if (match['id'] != selectedPeer) {
-                            setDialogState(() => selectedPeer = match['id']!);
-                          }
-                        },
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Số Peer (Nhập tay):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: peerController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    hintText: '7, 25, 100...',
+                                    prefixText: 'Peer ',
+                                    isDense: true,
+                                  ),
+                                  onChanged: (val) {
+                                    final n = int.tryParse(val.trim());
+                                    if (n != null && n > 0) {
+                                      ipController.text = '10.13.13.${n + 1}';
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Địa chỉ IP VPN nội bộ:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: ipController,
+                                  decoration: InputDecoration(
+                                    hintText: '10.13.13.x hoặc IP bất kỳ',
+                                    helperText: 'Tự động tính theo Peer hoặc nhập tay tùy ý',
+                                    helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                    isDense: true,
+                                  ),
+                                  onChanged: (val) {
+                                    final match = RegExp(r'^10\.13\.13\.(\d+)$').firstMatch(val.trim());
+                                    if (match != null) {
+                                      final octet = int.tryParse(match.group(1)!);
+                                      if (octet != null && octet >= 2) {
+                                        peerController.text = '${octet - 1}';
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 14),
 
@@ -356,23 +364,17 @@ class _DevicesPageState extends State<DevicesPage> {
     int selectedDept = device.departmentId ?? (mock.departments.isNotEmpty ? mock.departments.first.departmentId : 1);
     int selectedUser = device.userId ?? (mock.users.isNotEmpty ? mock.users.first.userId : 1);
 
-    final peerList = <Map<String, String>>[
-      for (int i = 1; i <= 20; i++)
-        {
-          'id': 'peer$i',
-          'label': 'Peer $i (10.13.13.${i + 1})${i == 1 ? " - Admin" : (i == 7 ? " - Máy Gia Bảo" : "")}',
-          'ip': '10.13.13.${i + 1}',
-        },
-      {'id': 'custom', 'label': 'Nhập IP tùy chỉnh khác...', 'ip': ''},
-    ];
-
-    String selectedPeer = 'custom';
-    for (final p in peerList) {
-      if (p['ip'] == (device.ipAddress ?? '').trim()) {
-        selectedPeer = p['id']!;
-        break;
+    String initialPeer = '';
+    if (device.ipAddress != null) {
+      final match = RegExp(r'^10\.13\.13\.(\d+)$').firstMatch(device.ipAddress!.trim());
+      if (match != null) {
+        final octet = int.tryParse(match.group(1)!);
+        if (octet != null && octet >= 2) {
+          initialPeer = '${octet - 1}';
+        }
       }
     }
+    final peerController = TextEditingController(text: initialPeer);
 
     showDialog(
       context: context,
@@ -463,45 +465,63 @@ class _DevicesPageState extends State<DevicesPage> {
                       ),
                       const SizedBox(height: 14),
 
-                      const Text('Gán WireGuard Peer / IP VPN:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        value: selectedPeer,
-                        isExpanded: true,
-                        decoration: const InputDecoration(isDense: true),
-                        items: peerList.map((p) {
-                          return DropdownMenuItem<String>(
-                            value: p['id']!,
-                            child: Text(p['label']!, overflow: TextOverflow.ellipsis),
-                          );
-                        }).toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setDialogState(() {
-                              selectedPeer = v;
-                              if (v != 'custom') {
-                                final found = peerList.firstWhere((p) => p['id'] == v);
-                                ipController.text = found['ip']!;
-                              }
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: ipController,
-                        decoration: InputDecoration(
-                          hintText: '10.13.13.x',
-                          helperText: 'Cập nhật IP theo đúng file WireGuard của máy đối tác',
-                          helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                          isDense: true,
-                        ),
-                        onChanged: (val) {
-                          final match = peerList.firstWhere((p) => p['ip'] == val.trim(), orElse: () => {'id': 'custom'});
-                          if (match['id'] != selectedPeer) {
-                            setDialogState(() => selectedPeer = match['id']!);
-                          }
-                        },
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Số Peer (Nhập tay):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: peerController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    hintText: '7, 25, 100...',
+                                    prefixText: 'Peer ',
+                                    isDense: true,
+                                  ),
+                                  onChanged: (val) {
+                                    final n = int.tryParse(val.trim());
+                                    if (n != null && n > 0) {
+                                      ipController.text = '10.13.13.${n + 1}';
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Địa chỉ IP VPN nội bộ:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: ipController,
+                                  decoration: InputDecoration(
+                                    hintText: '10.13.13.x hoặc IP bất kỳ',
+                                    helperText: 'Tự động tính theo Peer hoặc nhập tay tùy ý',
+                                    helperStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                    isDense: true,
+                                  ),
+                                  onChanged: (val) {
+                                    final match = RegExp(r'^10\.13\.13\.(\d+)$').firstMatch(val.trim());
+                                    if (match != null) {
+                                      final octet = int.tryParse(match.group(1)!);
+                                      if (octet != null && octet >= 2) {
+                                        peerController.text = '${octet - 1}';
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 14),
 
@@ -594,12 +614,17 @@ class _DevicesPageState extends State<DevicesPage> {
             ),
             ElevatedButton(
               onPressed: () async {
-                await api.deleteDevice(device.deviceId);
+                final ok = await api.deleteDevice(device.deviceId);
                 if (!mounted) return;
                 Navigator.pop(ctx);
+                MockDataService().devices.removeWhere((d) => d.deviceId == device.deviceId);
                 setState(() {});
+                _fetchDevices(isSilent: true);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã xóa thiết bị thành công!')),
+                  SnackBar(
+                    content: Text(ok ? 'Đã xóa thiết bị thành công!' : 'Xóa thiết bị thất bại'),
+                    backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  ),
                 );
               },
               style: ElevatedButton.styleFrom(
