@@ -33,6 +33,18 @@ class _OverviewPageState extends State<OverviewPage> {
     final matchDev = mock.devices.where((d) => d.vynexId.replaceAll(' ', '') == cleanTarget).toList();
     final device = matchDev.isNotEmpty ? matchDev.first : null;
 
+    // CHẶN TỰ KẾT NỐI VÀO MÁY CỦA CHÍNH MÌNH:
+    final isSelfConnect = (device != null && device.userId == auth.currentUser.userId);
+    if (isSelfConnect) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đây là thiết bị của chính bạn! Hệ thống không cho phép tự kết nối đến chính mình.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
     // BẢO VỆ TỐI CAO ADMIN (UNIDIRECTIONAL GUARD):
     // Tuyệt đối không cho phép máy khác kết nối điều khiển máy của Admin (userId == 1)
     final isTargetAdmin = (device != null && (device.userId == 1 || device.name.toLowerCase().contains('admin')));
@@ -378,6 +390,7 @@ class _OverviewPageState extends State<OverviewPage> {
 
   Widget _buildRemoteConnectCard(BuildContext context, bool isDark) {
     final mock = MockDataService();
+    final auth = Provider.of<AuthService>(context, listen: false);
 
     return Card(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -507,7 +520,7 @@ class _OverviewPageState extends State<OverviewPage> {
               spacing: 10,
               runSpacing: 10,
               children: mock.devices
-                  .where((dev) => dev.deviceId != 2)
+                  .where((dev) => dev.userId != auth.currentUser.userId)
                   .map((dev) {
                 final isSelected = _remoteIdController.text == dev.vynexId;
                 return InkWell(

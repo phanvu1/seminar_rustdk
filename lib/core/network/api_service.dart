@@ -453,6 +453,20 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> rejectSupportRequest(int requestId, String reason) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/reject?reason=${Uri.encodeComponent(reason)}');
+      final res = await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        _isBackendConnected = true;
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] rejectSupportRequest fallback: $e');
+    }
+    return true;
+  }
+
   Future<bool> cancelSupportRequest(int requestId) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/cancel');

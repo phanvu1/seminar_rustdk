@@ -752,6 +752,25 @@ def reject_support_request(id: int, reason: Optional[str] = "Không thể xử l
         query = text("UPDATE SupportRequests SET status = 'rejected', feedback = :r WHERE request_id = :id")
         db.execute(query, {"id": id, "r": reason})
         db.commit()
+
+        # Gửi thông báo cho nhân viên rằng ticket đã bị từ chối
+        try:
+            emp_row = db.execute(text("SELECT employee_id, title FROM SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
+            if emp_row:
+                emp_id, title = emp_row
+                db.execute(text("""
+                    INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'support_request', :ref, 0, CURRENT_TIMESTAMP)
+                """), {
+                    "uid": emp_id,
+                    "t": f"Yêu cầu #{id} bị từ chối",
+                    "c": f"Kỹ thuật viên IT đã từ chối yêu cầu \"{title}\". Lý do: {reason}",
+                    "ref": id
+                })
+                db.commit()
+        except Exception:
+            pass
+
         return {"message": f"Đã từ chối ticket #{id}"}
     except Exception as e:
         db.rollback()

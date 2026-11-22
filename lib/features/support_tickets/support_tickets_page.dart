@@ -254,6 +254,18 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     // Tuyệt đối không một kỹ thuật viên nào được phép kết nối điều khiển máy của Admin
     final mock = MockDataService();
     final targetDev = mock.devices.where((d) => d.deviceId == ticket.deviceId).toList();
+
+    // CHẶN TỰ KẾT NỐI VÀO MÁY CỦA CHÍNH MÌNH:
+    if (ticket.employeeId == auth.currentUser.userId || (targetDev.isNotEmpty && targetDev.first.userId == auth.currentUser.userId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đây là thiết bị của chính bạn! Hệ thống không cho phép tự kết nối đến chính mình.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
     final isTargetAdmin = ticket.employeeId == 1 || (targetDev.isNotEmpty && targetDev.first.userId == 1);
 
     if (isTargetAdmin && auth.currentUser.userId != 1) {
@@ -893,8 +905,16 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                                 ),
                               ],
                               OutlinedButton(
-                                onPressed: () {
-                                  ticketService.rejectTicket(ticket.requestId, 'Không thuộc phạm vi hỗ trợ');
+                                onPressed: () async {
+                                  await ticketService.rejectTicket(ticket.requestId, 'Không thuộc phạm vi hỗ trợ');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Đã từ chối yêu cầu hỗ trợ #${ticket.requestId}!'),
+                                        backgroundColor: const Color(0xFFEF4444),
+                                      ),
+                                    );
+                                  }
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: const Color(0xFFEF4444),
@@ -1005,16 +1025,42 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                                               ),
                                             ),
                                         ],
-                                        ElevatedButton.icon(
-                                          onPressed: () => _handleItConnect(context, ticket),
-                                          icon: const Icon(Icons.cast_connected_rounded, size: 16),
-                                          label: Text(isAdmin ? 'Admin Kết Nối Ngay' : (hasPerm ? 'Kết Nối Ngay' : 'Kết Nối')),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: hasPerm ? const Color(0xFF10B981) : AppConstants.primaryBlue,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                        if (ticket.employeeId == auth.currentUser.userId) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                            decoration: BoxDecoration(
+                                              color: AppConstants.primaryBlue.withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: AppConstants.primaryBlue.withOpacity(0.3)),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.person_pin_circle_rounded, size: 15, color: AppConstants.primaryBlue),
+                                                SizedBox(width: 5),
+                                                Text(
+                                                  'Máy của bạn (Thiết bị này)',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppConstants.primaryBlue,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
+                                        ] else ...[
+                                          ElevatedButton.icon(
+                                            onPressed: () => _handleItConnect(context, ticket),
+                                            icon: const Icon(Icons.cast_connected_rounded, size: 16),
+                                            label: Text(isAdmin ? 'Admin Kết Nối Ngay' : (hasPerm ? 'Kết Nối Ngay' : 'Kết Nối')),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: hasPerm ? const Color(0xFF10B981) : AppConstants.primaryBlue,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            ),
+                                          ),
+                                        ],
                                         ElevatedButton.icon(
                                           onPressed: () async {
                                             final confirm = await showDialog<bool>(

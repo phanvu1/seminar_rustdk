@@ -160,6 +160,7 @@ class SupportTicketService extends ChangeNotifier {
         MockDataService().supportRequests[mockIdx] = _tickets[idx];
       }
       notifyListeners();
+      await ApiService().rejectSupportRequest(requestId, reason);
       return true;
     }
     return false;

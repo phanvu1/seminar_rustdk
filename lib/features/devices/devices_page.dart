@@ -897,7 +897,27 @@ class _DevicesPageState extends State<DevicesPage> {
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (dev.userId == 1 && auth.currentUser.userId != 1) ...[
+                              if (dev.userId == auth.currentUser.userId) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.primaryBlue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppConstants.primaryBlue.withOpacity(0.3)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.person_pin_circle_rounded, size: 14, color: AppConstants.primaryBlue),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Máy của bạn (Thiết bị này)',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppConstants.primaryBlue),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else if (dev.userId == 1 && auth.currentUser.userId != 1) ...[
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
