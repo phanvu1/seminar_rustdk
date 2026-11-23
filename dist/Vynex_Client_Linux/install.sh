@@ -80,6 +80,8 @@ custom-rendezvous-server = '10.13.13.1'
 relay-server = '10.13.13.1:21117'
 api-server = 'http://34.87.182.49:8000'
 key = 'NUvcbnr2VL3iLPCvmn2DjoZGMEtbQ27aEW1djMgev+M='
+direct-server = 'Y'
+direct-access-port = '21118'
 allow-auto-disconnect = 'N'
 verification-method = 'both'"
 

@@ -1,0 +1,35 @@
+BÁO CÁO TOÀN DIỆN CÁC THAY ĐỔI TRONG MÃ NGUỒN RUSTDESK (VYNEX CLIENT)
+================================================================================
+Nguyên tắc cốt lõi: TỐI THIỂU CAN THIỆP VÀO NHÂN RUSTDESK (MINIMAL INVASION)
+Toàn bộ lõi truyền dữ liệu P2P/Relay, nén hình ảnh video codec, xử lý âm thanh,
+chuột bàn phím của RustDesk được GIỮ NGUYÊN VẸN 100%.
+
+Sự can thiệp chỉ diễn ra tại 4 tầng ngoại vi:
+1. Nhận diện thương hiệu (Branding / Logo / Icon / App Name): RustDesk -> Vynex
+2. Việt hóa giao diện (Localization - vi.rs): Dịch mượt mà, tự nhiên chuẩn kỹ thuật
+3. Chốt chặn bảo mật (Vynex Permission Guard & Anti-Bypass)
+4. Cấu hình máy chủ VPS & WireGuard VPN mặc định
+
+================================================================================
+1. DANH SÁCH CHI TIẾT CÁC TỆP ĐÃ THAY ĐỔI
+================================================================================
+- rustdesk/Cargo.toml: Đổi ProductName và Description từ "RustDesk" thành "Vynex"
+- rustdesk/libs/portable/Cargo.toml: Đổi ProductName và Description sang "Vynex"
+- rustdesk/flutter/windows/CMakeLists.txt: Đổi BINARY_NAME từ "rustdesk" thành "vynex"
+- rustdesk/flutter/windows/runner/Runner.rc: Đổi InternalName, OriginalFilename sang "vynex.exe"
+- rustdesk/flutter/windows/runner/main.cpp: Đổi tên app mặc định sang L"Vynex"
+- rustdesk/flutter/lib/desktop/widgets/tabbar_widget.dart: Gọi bind.mainGetAppNameSync()
+- rustdesk/res/icon.ico, icon.png, logo.svg: Bộ logo và icon Vynex màu xanh công nghệ
+- rustdesk/flutter/assets/icon.svg: Logo icon giao diện Flutter của Vynex
+- rustdesk/src/lang/vi.rs: Toàn bộ tinh chỉnh ngôn ngữ tiếng Việt tự nhiên và mượt mà
+- rustdesk/libs/hbb_common/src/proxy.rs: Việt hóa lỗi rớt mạng 10054 thành "Lỗi kết nối máy chủ"
+- rustdesk/libs/hbb_common/src/config.rs: Cấu hình mặc định Rendezvous Server 10.13.13.1, Relay 21117, API port 8000
+- rustdesk/flutter/lib/main.dart: Tự động gán cấu hình Server VPS nếu máy mới cài đặt
+- rustdesk/flutter/lib/common.dart: Nhận tham số CLI --token và --it-user, tích hợp Permission Guard
+- rustdesk/flutter/lib/vynex_permission_guard.dart (TỆP MỚI): Chốt chặn bảo mật Zero-Trust với Backend
+
+================================================================================
+2. CHI TIẾT UNIFIED DIFF
+================================================================================
+Xem báo cáo chi tiết đầy đủ với code so sánh từng dòng tại:
+docs/RUSTDESK_CHANGES_AND_DIFF.md
