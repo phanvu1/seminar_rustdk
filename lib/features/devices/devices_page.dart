@@ -85,6 +85,7 @@ class _DevicesPageState extends State<DevicesPage> {
     final ipController = TextEditingController(text: '10.13.13.8');
 
     String selectedType = 'desktop';
+    String selectedOs = 'Windows 11 Pro';
 
     // Ưu tiên chọn nhân viên mới nhất (không phải Admin)
     final nonAdmins = mock.users.where((u) => u.userId != 1).toList();
@@ -128,6 +129,14 @@ class _DevicesPageState extends State<DevicesPage> {
                           hintText: 'Ví dụ: Máy của Bảo (Kế toán)',
                           isDense: true,
                         ),
+                        onChanged: (val) {
+                          final lower = val.toLowerCase();
+                          if (lower.contains('ubuntu') || lower.contains('linux') || lower.contains('mai')) {
+                            setDialogState(() => selectedOs = 'Ubuntu Linux 24.04 LTS');
+                          } else if (lower.contains('mac') || lower.contains('apple')) {
+                            setDialogState(() => selectedOs = 'macOS Sonoma / Sequoia');
+                          }
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -211,6 +220,27 @@ class _DevicesPageState extends State<DevicesPage> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text('Hệ điều hành (OS):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedOs,
+                        isExpanded: true,
+                        decoration: const InputDecoration(isDense: true),
+                        items: const [
+                          DropdownMenuItem(value: 'Windows 11 Pro', child: Text('Windows 11 Pro')),
+                          DropdownMenuItem(value: 'Ubuntu Linux 24.04 LTS', child: Text('Ubuntu Linux 24.04 LTS')),
+                          DropdownMenuItem(value: 'Ubuntu Linux 22.04 LTS', child: Text('Ubuntu Linux 22.04 LTS')),
+                          DropdownMenuItem(value: 'macOS Sonoma / Sequoia', child: Text('macOS Sonoma / Sequoia')),
+                          DropdownMenuItem(value: 'Windows 10 Pro', child: Text('Windows 10 Pro')),
+                          DropdownMenuItem(value: 'Windows Server 2022', child: Text('Windows Server 2022')),
+                          DropdownMenuItem(value: 'Linux khác', child: Text('Linux khác')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => selectedOs = v);
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -322,6 +352,7 @@ class _DevicesPageState extends State<DevicesPage> {
                       'user_id': selectedUser,
                       'department_id': selectedDept,
                       'device_type': selectedType,
+                      'os_name': selectedOs,
                       'ip_address': ipController.text.trim(),
                     });
                     if (!mounted) return;
@@ -361,6 +392,7 @@ class _DevicesPageState extends State<DevicesPage> {
     final vynexIdController = TextEditingController(text: device.vynexId);
     final ipController = TextEditingController(text: device.ipAddress ?? '');
     String selectedType = device.deviceType;
+    String selectedOs = device.osName ?? 'Windows 11 Pro';
     int selectedDept = device.departmentId ?? (mock.departments.isNotEmpty ? mock.departments.first.departmentId : 1);
     int selectedUser = device.userId ?? (mock.users.isNotEmpty ? mock.users.first.userId : 1);
 
@@ -462,6 +494,27 @@ class _DevicesPageState extends State<DevicesPage> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text('Hệ điều hành (OS):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedOs,
+                        isExpanded: true,
+                        decoration: const InputDecoration(isDense: true),
+                        items: const [
+                          DropdownMenuItem(value: 'Windows 11 Pro', child: Text('Windows 11 Pro')),
+                          DropdownMenuItem(value: 'Ubuntu Linux 24.04 LTS', child: Text('Ubuntu Linux 24.04 LTS')),
+                          DropdownMenuItem(value: 'Ubuntu Linux 22.04 LTS', child: Text('Ubuntu Linux 22.04 LTS')),
+                          DropdownMenuItem(value: 'macOS Sonoma / Sequoia', child: Text('macOS Sonoma / Sequoia')),
+                          DropdownMenuItem(value: 'Windows 10 Pro', child: Text('Windows 10 Pro')),
+                          DropdownMenuItem(value: 'Windows Server 2022', child: Text('Windows Server 2022')),
+                          DropdownMenuItem(value: 'Linux khác', child: Text('Linux khác')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => selectedOs = v);
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -573,6 +626,7 @@ class _DevicesPageState extends State<DevicesPage> {
                       'user_id': selectedUser,
                       'department_id': selectedDept,
                       'device_type': selectedType,
+                      'os_name': selectedOs,
                       'ip_address': ipController.text.trim(),
                     });
                     if (!mounted) return;
@@ -803,8 +857,18 @@ class _DevicesPageState extends State<DevicesPage> {
               itemBuilder: (context, index) {
                 final dev = devices[index];
                 IconData typeIcon = Icons.computer_rounded;
-                if (dev.deviceType == 'laptop') typeIcon = Icons.laptop_mac_rounded;
-                if (dev.deviceType == 'server') typeIcon = Icons.dns_rounded;
+                final osLower = (dev.osName ?? '').toLowerCase();
+                if (osLower.contains('ubuntu') || osLower.contains('linux')) {
+                  typeIcon = Icons.terminal_rounded;
+                } else if (osLower.contains('mac') || osLower.contains('apple')) {
+                  typeIcon = Icons.laptop_mac_rounded;
+                } else if (dev.deviceType == 'laptop') {
+                  typeIcon = Icons.laptop_windows_rounded;
+                } else if (dev.deviceType == 'server') {
+                  typeIcon = Icons.dns_rounded;
+                } else {
+                  typeIcon = Icons.desktop_windows_rounded;
+                }
 
                 return Padding(
                   padding: const EdgeInsets.all(16),

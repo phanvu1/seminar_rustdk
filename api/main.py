@@ -200,6 +200,7 @@ class DeviceCreate(BaseModel):
     ip_address: Optional[str] = "10.13.13.2"
     department_id: Optional[int] = None
     device_type: Optional[str] = "desktop"
+    os_name: Optional[str] = "Windows 11 Pro"
 
 class SupportRequestCreate(BaseModel):
     employee_id: int
@@ -241,6 +242,15 @@ class NotificationCreate(BaseModel):
     content: Optional[str] = ""
     type: str = "general" # support_request, permission_request, permission_granted, permission_revoked, session_started, session_ended, general
     reference_id: Optional[int] = None
+
+class ActivityLogCreate(BaseModel):
+    user_id: int
+    device_id: Optional[int] = None
+    action: str
+    description: Optional[str] = ""
+    ip_address: Optional[str] = "127.0.0.1"
+    target_type: Optional[str] = "SYSTEM"
+    status: Optional[str] = "success"
 
 # =====================================================================
 # 4. API ENDPOINTS (ROUTES ĐẦY ĐỦ 100%)
@@ -577,23 +587,25 @@ def create_device(req: DeviceCreate, db: Session = Depends(get_db)):
             db.execute(text("""
                 UPDATE Devices 
                 SET user_id = :uid, device_name = :dname, rustdesk_id = :rid, ip_address = :ip, 
-                    department_id = :dept, device_type = :dtype, status = 'online', 
+                    department_id = :dept, device_type = :dtype, os_name = :os, status = 'online', 
                     deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
                 WHERE device_id = :did
             """), {
                 "did": dev_id, "uid": req.user_id, "dname": req.device_name,
-                "rid": clean_rid, "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
+                "rid": clean_rid, "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type,
+                "os": req.os_name or "Windows 11 Pro"
             })
             db.commit()
             return {"message": f"Cập nhật và kích hoạt thiết bị '{req.device_name}' (ID: {clean_rid}) thành công"}
 
         query = text("""
-            INSERT INTO Devices (user_id, device_name, rustdesk_id, ip_address, department_id, device_type, status, last_online)
-            VALUES (:uid, :dname, :rid, :ip, :dept, :dtype, 'online', CURRENT_TIMESTAMP)
+            INSERT INTO Devices (user_id, device_name, rustdesk_id, ip_address, department_id, device_type, os_name, status, last_online)
+            VALUES (:uid, :dname, :rid, :ip, :dept, :dtype, :os, 'online', CURRENT_TIMESTAMP)
         """)
         db.execute(query, {
             "uid": req.user_id, "dname": req.device_name, "rid": clean_rid,
-            "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type
+            "ip": req.ip_address, "dept": req.department_id, "dtype": req.device_type,
+            "os": req.os_name or "Windows 11 Pro"
         })
         db.commit()
         return {"message": f"Thêm thiết bị '{req.device_name}' (ID: {clean_rid}) thành công"}
@@ -609,12 +621,13 @@ def update_device(id: int, req: DeviceCreate, db: Session = Depends(get_db)):
             UPDATE Devices 
             SET user_id = :uid, device_name = :dname, rustdesk_id = :rid,
                 ip_address = :ip, department_id = :dept, device_type = :dtype,
+                os_name = :os,
                 updated_at = CURRENT_TIMESTAMP
             WHERE device_id = :did
         """), {
             "did": id, "uid": req.user_id, "dname": req.device_name,
             "rid": clean_rid, "ip": req.ip_address, "dept": req.department_id,
-            "dtype": req.device_type
+            "dtype": req.device_type, "os": req.os_name or "Windows 11 Pro"
         })
         db.commit()
         return {"message": f"Cập nhật thiết bị ID {id} thành công"}
@@ -1196,3 +1209,59 @@ def mark_all_notifications_read(user_id: Optional[int] = None, db: Session = Dep
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+# =====================================================================
+# 6. NHÓM 9: NHẬT KÝ KIỂM TOÁN (AUDIT & ACTIVITY LOGS)
+# =====================================================================
+
+@app.get("/api/activity-logs")
+def get_activity_logs(db: Session = Depends(get_db)):
+    """Lấy danh sách nhật ký kiểm toán hệ thống (ActivityLogs)"""
+    try:
+        query = text("""
+            SELECT l.log_id, l.user_id, u.full_name as user_name, l.device_id,
+                   l.action, l.description, l.ip_address, l.target_type, l.status, l.created_at
+            FROM ActivityLogs l
+            LEFT JOIN Users u ON l.user_id = u.user_id
+            ORDER BY l.log_id DESC
+            LIMIT 150
+        """)
+        rows = db.execute(query).fetchall()
+        return {"data": [{
+            "log_id": r[0],
+            "user_id": r[1],
+            "user_name": r[2] or f"User #{r[1]}",
+            "device_id": r[3],
+            "action": r[4],
+            "description": r[5] or "",
+            "ip_address": r[6] or "127.0.0.1",
+            "target_type": r[7],
+            "status": r[8] or "success",
+            "created_at": str(r[9])
+        } for r in rows]}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+@app.post("/api/activity-logs")
+def create_activity_log(req: ActivityLogCreate, db: Session = Depends(get_db)):
+    """Ghi nhận nhật ký hành động vào ActivityLogs"""
+    try:
+        query = text("""
+            INSERT INTO ActivityLogs (user_id, device_id, action, description, ip_address, target_type, status, created_at)
+            VALUES (:uid, :did, :action, :desc, :ip, :ttype, :status, CURRENT_TIMESTAMP)
+        """)
+        db.execute(query, {
+            "uid": req.user_id,
+            "did": req.device_id,
+            "action": req.action,
+            "desc": req.description,
+            "ip": req.ip_address or "127.0.0.1",
+            "ttype": req.target_type or "SYSTEM",
+            "status": req.status or "success"
+        })
+        db.commit()
+        return {"message": "Ghi nhận nhật ký thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+

@@ -11,6 +11,7 @@ import '../../models/support_request_model.dart';
 import '../../models/permission_model.dart';
 import '../../models/remote_session_model.dart';
 import '../../models/notification_model.dart';
+import '../../models/activity_log_model.dart';
 
 class ApiService extends ChangeNotifier {
   static final ApiService _instance = ApiService._internal();
@@ -623,6 +624,25 @@ class ApiService extends ChangeNotifier {
     MockDataService().sessions.insert(0, session);
     notifyListeners();
     return true;
+  }
+
+  // --- ACTIVITY LOGS (AUDIT) ---
+  Future<List<ActivityLogModel>> getActivityLogs() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/activity-logs');
+      final res = await http.get(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
+      if (res.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(res.bodyBytes));
+        final list = (json['data'] as List).map((e) => ActivityLogModel.fromJson(e)).toList();
+        MockDataService().activityLogs = list;
+        _isBackendConnected = true;
+        notifyListeners();
+        return list;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] getActivityLogs fallback: $e');
+    }
+    return MockDataService().activityLogs;
   }
 
   // --- DEPARTMENTS ---

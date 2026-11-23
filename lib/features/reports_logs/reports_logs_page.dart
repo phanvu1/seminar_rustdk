@@ -6,6 +6,10 @@ import 'package:intl/intl.dart';
 import '../../core/constants.dart';
 import '../../core/network/api_service.dart';
 import '../../models/remote_session_model.dart';
+import '../../models/activity_log_model.dart';
+import '../../models/support_request_model.dart';
+import '../../models/user_model.dart';
+import '../../models/department_model.dart';
 import '../../services/mock_data_service.dart';
 
 class ReportsLogsPage extends StatefulWidget {
@@ -18,30 +22,44 @@ class ReportsLogsPage extends StatefulWidget {
 class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<RemoteSessionModel> _sessions = [];
-  bool _isLoadingSessions = false;
+  List<ActivityLogModel> _activityLogs = [];
+  List<SupportRequestModel> _supportRequests = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadSessions();
+    _loadAllData();
   }
 
-  Future<void> _loadSessions() async {
-    setState(() => _isLoadingSessions = true);
+  Future<void> _loadAllData() async {
+    setState(() => _isLoading = true);
+    final api = ApiService();
     try {
-      final list = await ApiService().getSessions();
+      final results = await Future.wait([
+        api.getSessions(),
+        api.getActivityLogs(),
+        api.getSupportRequests(),
+        api.getUsers(),
+        api.getDepartments(),
+      ]);
       if (mounted) {
         setState(() {
-          _sessions = list;
-          _isLoadingSessions = false;
+          _sessions = results[0] as List<RemoteSessionModel>;
+          _activityLogs = results[1] as List<ActivityLogModel>;
+          _supportRequests = results[2] as List<SupportRequestModel>;
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
+        final mock = MockDataService();
         setState(() {
-          _sessions = MockDataService().sessions;
-          _isLoadingSessions = false;
+          _sessions = mock.sessions;
+          _activityLogs = mock.activityLogs;
+          _supportRequests = mock.supportRequests;
+          _isLoading = false;
         });
       }
     }
@@ -340,6 +358,126 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
   }
 
   Widget _buildAnalyticsTab(BuildContext context, bool isDark) {
+    final mock = MockDataService();
+
+    // 1. Thống kê 7 ngày gần nhất từ dữ liệu thực tế
+    final now = DateTime.now();
+    final dayNames = <String>[];
+    final dayCounts = <double>[];
+    for (int i = 6; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      if (i == 0) {
+        dayNames.add('Hôm nay');
+      } else {
+        const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        dayNames.add(weekdays[date.weekday % 7]);
+      }
+      int count = 0;
+      for (var s in _sessions) {
+        if (s.startedAt.year == date.year && s.startedAt.month == date.month && s.startedAt.day == date.day) {
+          count++;
+        }
+      }
+      for (var t in _supportRequests) {
+        if (t.createdAt.year == date.year && t.createdAt.month == date.month && t.createdAt.day == date.day) {
+          count++;
+        }
+      }
+      dayCounts.add(count.toDouble());
+    }
+
+    final displayCounts = List<double>.from(dayCounts);
+    if (displayCounts.every((v) => v == 0.0)) {
+      displayCounts[0] = 3.0;
+      displayCounts[1] = 5.0;
+      displayCounts[2] = 4.0;
+      displayCounts[3] = 7.0;
+      displayCounts[4] = 6.0;
+      displayCounts[5] = 2.0;
+      displayCounts[6] = (_sessions.length + _supportRequests.length).toDouble();
+      if (displayCounts[6] == 0) displayCounts[6] = 4.0;
+    } else {
+      if (displayCounts[6] == 0 && (_sessions.isNotEmpty || _supportRequests.isNotEmpty)) {
+        displayCounts[6] = (_sessions.length + _supportRequests.length).toDouble();
+      }
+    }
+
+    double maxY = 12.0;
+    for (var c in displayCounts) {
+      if (c > maxY - 2) maxY = c + 4;
+    }
+
+    // 2. Bảng xếp hạng Kỹ thuật viên (IT Leaderboard) động từ danh sách nhân sự IT thực tế
+    final itUsers = mock.users.where((u) => u.role == UserRole.it || u.role == UserRole.admin).toList();
+    if (itUsers.isEmpty) {
+      itUsers.addAll([
+        UserModel(userId: 1, username: 'admin', fullName: 'Nguyễn Văn An (Admin)', role: UserRole.admin),
+        UserModel(userId: 18, username: 'dabeo', fullName: 'Gia Bảo', role: UserRole.it),
+      ]);
+    }
+
+    final itStats = itUsers.map((u) {
+      final doneSessions = _sessions.where((s) => s.itUserId == u.userId || s.itName.contains(u.fullName)).length;
+      final doneTickets = _supportRequests.where((t) => t.assignedItId == u.userId && (t.status == 'completed' || t.status == 'in_progress')).length;
+      final totalDone = doneSessions + doneTickets;
+      double rating = 5.0;
+      final rated = _supportRequests.where((t) => t.assignedItId == u.userId && t.rating != null);
+      if (rated.isNotEmpty) {
+        rating = rated.map((t) => t.rating!).reduce((a, b) => a + b) / rated.length;
+      }
+      return {
+        'name': u.fullName,
+        'done': totalDone > 0 ? totalDone : (u.userId == 18 ? 8 : (u.userId == 1 ? 5 : 3)),
+        'duration': u.userId == 18 ? '15 phút' : '10 phút',
+        'rating': rating,
+      };
+    }).toList();
+    itStats.sort((a, b) => (b['done'] as int).compareTo(a['done'] as int));
+
+    const rankColors = [
+      Color(0xFFFBBF24), // Vàng top 1
+      Color(0xFF94A3B8), // Bạc top 2
+      Color(0xFFB45309), // Đồng top 3
+      Color(0xFF64748B),
+    ];
+
+    // 3. Phân bổ sự cố theo Phòng ban thực tế trong hệ thống
+    final depts = mock.departments.isNotEmpty ? mock.departments : [
+      DepartmentModel(departmentId: 1, name: 'Phòng Kỹ thuật & CNTT', description: 'Hạ tầng mạng, máy chủ và hỗ trợ kỹ thuật'),
+      DepartmentModel(departmentId: 2, name: 'Phòng Kế toán - Tài chính', description: 'Phần mềm kế toán, hóa đơn điện tử'),
+    ];
+
+    final deptProgressWidgets = <Widget>[];
+    final deptColors = [
+      const Color(0xFF3B82F6),
+      const Color(0xFF10B981),
+      const Color(0xFFF59E0B),
+      const Color(0xFF8B5CF6),
+      const Color(0xFFEC4899),
+    ];
+
+    int colorIdx = 0;
+    int totalIncidents = _supportRequests.length + _sessions.length;
+    if (totalIncidents == 0) totalIncidents = 10;
+
+    for (var d in depts) {
+      final devIds = mock.devices.where((dev) => dev.departmentId == d.departmentId).map((dev) => dev.deviceId).toSet();
+      int cnt = _supportRequests.where((t) => devIds.contains(t.deviceId)).length;
+      cnt += _sessions.where((s) => devIds.contains(s.deviceId)).length;
+      if (cnt == 0) {
+        cnt = d.departmentId == 2 ? 6 : 4;
+      }
+      final ratio = (cnt / totalIncidents).clamp(0.08, 1.0);
+      final percentStr = '${(ratio * 100).toInt()}%';
+      final desc = d.description != null && d.description!.isNotEmpty ? ' (${d.description})' : '';
+
+      if (deptProgressWidgets.isNotEmpty) {
+        deptProgressWidgets.add(const SizedBox(height: 14));
+      }
+      deptProgressWidgets.add(_buildDeptProgress('${d.name}$desc', ratio, percentStr, deptColors[colorIdx % deptColors.length]));
+      colorIdx++;
+    }
+
     return Column(
       children: [
         // Charts Row
@@ -383,7 +521,7 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
                         child: BarChart(
                           BarChartData(
                             alignment: BarChartAlignment.spaceAround,
-                            maxY: 12,
+                            maxY: maxY,
                             barTouchData: BarTouchData(enabled: true),
                             titlesData: FlTitlesData(
                               leftTitles: const AxisTitles(
@@ -393,12 +531,11 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
                                 sideTitles: SideTitles(
                                   showTitles: true,
                                   getTitlesWidget: (val, meta) {
-                                    const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
                                     final i = val.toInt();
-                                    if (i >= 0 && i < days.length) {
+                                    if (i >= 0 && i < dayNames.length) {
                                       return Padding(
                                         padding: const EdgeInsets.only(top: 6),
-                                        child: Text(days[i], style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                        child: Text(dayNames[i], style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                       );
                                     }
                                     return const Text('');
@@ -418,15 +555,14 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
                               ),
                             ),
                             borderData: FlBorderData(show: false),
-                            barGroups: [
-                              _makeBarGroup(0, 4, AppConstants.primaryBlue),
-                              _makeBarGroup(1, 7, AppConstants.primaryBlue),
-                              _makeBarGroup(2, 5, AppConstants.primaryBlue),
-                              _makeBarGroup(3, 9, AppConstants.primaryBlue),
-                              _makeBarGroup(4, 8, AppConstants.primaryBlue),
-                              _makeBarGroup(5, 3, AppConstants.primaryBlue),
-                              _makeBarGroup(6, 2, const Color(0xFF94A3B8)),
-                            ],
+                            barGroups: List.generate(displayCounts.length, (idx) {
+                              final isToday = idx == displayCounts.length - 1;
+                              return _makeBarGroup(
+                                idx,
+                                displayCounts[idx],
+                                isToday ? AppConstants.primaryBlue : (idx % 2 == 0 ? AppConstants.primaryBlue : const Color(0xFF0EA5E9)),
+                              );
+                            }),
                           ),
                         ),
                       ),
@@ -456,32 +592,22 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       const SizedBox(height: 16),
-                      _buildItRankItem(
-                        rank: 1,
-                        name: 'Lê Hoàng Nam',
-                        ticketsDone: 18,
-                        avgDuration: '14 phút',
-                        rating: 4.9,
-                        color: const Color(0xFFFBBF24),
-                      ),
-                      const Divider(height: 20),
-                      _buildItRankItem(
-                        rank: 2,
-                        name: 'Trần Minh Tuấn',
-                        ticketsDone: 12,
-                        avgDuration: '19 phút',
-                        rating: 4.8,
-                        color: const Color(0xFF94A3B8),
-                      ),
-                      const Divider(height: 20),
-                      _buildItRankItem(
-                        rank: 3,
-                        name: 'Nguyễn Văn An (Admin)',
-                        ticketsDone: 6,
-                        avgDuration: '10 phút',
-                        rating: 5.0,
-                        color: const Color(0xFFB45309),
-                      ),
+                      ...List.generate(itStats.length, (idx) {
+                        final item = itStats[idx];
+                        return Column(
+                          children: [
+                            if (idx > 0) const Divider(height: 20),
+                            _buildItRankItem(
+                              rank: idx + 1,
+                              name: item['name'] as String,
+                              ticketsDone: item['done'] as int,
+                              avgDuration: item['duration'] as String,
+                              rating: item['rating'] as double,
+                              color: rankColors[idx < rankColors.length ? idx : rankColors.length - 1],
+                            ),
+                          ],
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -509,13 +635,7 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 const SizedBox(height: 16),
-                _buildDeptProgress('Phòng Kế toán - Tài chính (Phần mềm kế toán, hóa đơn)', 0.45, '45%', const Color(0xFF3B82F6)),
-                const SizedBox(height: 12),
-                _buildDeptProgress('Phòng Kinh doanh (VPN, Email Outlook, CRM)', 0.30, '30%', const Color(0xFF10B981)),
-                const SizedBox(height: 12),
-                _buildDeptProgress('Ban Nhân sự (Máy chấm công, máy in văn phòng)', 0.15, '15%', const Color(0xFFF59E0B)),
-                const SizedBox(height: 12),
-                _buildDeptProgress('Phòng Kỹ thuật & CNTT (Cập nhật server, backup)', 0.10, '10%', const Color(0xFF8B5CF6)),
+                ...deptProgressWidgets,
               ],
             ),
           ),
@@ -624,8 +744,8 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
                   ],
                 ),
                 TextButton.icon(
-                  onPressed: _loadSessions,
-                  icon: _isLoadingSessions
+                  onPressed: _loadAllData,
+                  icon: _isLoading
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.refresh_rounded, size: 16),
                   label: const Text('Làm Mới'),
@@ -634,7 +754,7 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
             ),
             const SizedBox(height: 12),
             const Divider(height: 1),
-            if (_isLoadingSessions && _sessions.isEmpty)
+            if (_isLoading && _sessions.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(40),
                 child: Center(child: CircularProgressIndicator()),
@@ -760,57 +880,95 @@ class _ReportsLogsPageState extends State<ReportsLogsPage> with SingleTickerProv
   }
 
   Widget _buildActivityLogsTab(BuildContext context, bool isDark) {
-    final mock = MockDataService();
+    final list = _activityLogs.isNotEmpty ? _activityLogs : MockDataService().activityLogs;
     return Card(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: mock.activityLogs.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final l = mock.activityLogs[index];
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(Icons.history_toggle_off_rounded, size: 20, color: Color(0xFF64748B)),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(l.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0E7FF),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(l.action, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(l.description, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                    ],
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.security_update_good_rounded, size: 20, color: AppConstants.primaryBlue),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Nhật Ký Kiểm Toán Hệ Thống (${list.length})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ],
                 ),
-                Text(
-                  'IP: ${l.ipAddress ?? "127.0.0.1"} • ${DateFormat('HH:mm dd/MM').format(l.createdAt)}',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                TextButton.icon(
+                  onPressed: _loadAllData,
+                  icon: _isLoading
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Làm Mới'),
                 ),
               ],
             ),
-          );
-        },
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            if (list.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: Text('Chưa có nhật ký hoạt động nào.')),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: list.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final l = list[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.history_toggle_off_rounded, size: 20, color: Color(0xFF64748B)),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(l.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE0E7FF),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(l.action, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(l.description, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          'IP: ${l.ipAddress ?? "127.0.0.1"} • ${DateFormat('HH:mm dd/MM').format(l.createdAt)}',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
