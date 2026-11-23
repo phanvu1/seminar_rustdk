@@ -16,6 +16,7 @@ class PermissionService extends ChangeNotifier {
   List<PermissionModel> _permissions = [];
   List<NotificationModel> _pendingRequests = [];
   final Set<String> _pendingTicketRequests = {};
+  final Set<String> _rejectedDeviceRequests = {};
   bool _isLoading = false;
   Timer? _pollingTimer;
 
@@ -45,14 +46,43 @@ class PermissionService extends ChangeNotifier {
 
   Future<void> fetchPendingRequests() async {
     try {
-      final notifs = await ApiService().getNotifications(userId: 1, role: UserRole.admin);
-      _pendingRequests = notifs.where((n) => n.type == 'permission_request' && !n.isRead).toList();
+      final auth = AuthService();
+      final myId = auth.currentUser.userId;
+      final myRole = auth.currentUser.role;
+
+      // 1. Nếu là Admin: lấy danh sách yêu cầu chờ duyệt
+      if (myRole == UserRole.admin) {
+        final notifs = await ApiService().getNotifications(userId: 1, role: UserRole.admin);
+        _pendingRequests = notifs.where((n) => n.type == 'permission_request' && !n.isRead).toList();
+      }
+
+      // 2. Nếu là IT: đồng bộ danh sách thông báo để biết Admin đã từ chối hay phê duyệt
+      final itNotifs = await ApiService().getNotifications(userId: myId, role: UserRole.it);
+      for (final n in itNotifs) {
+        final devId = n.referenceId;
+        if (devId != null && devId > 0) {
+          if (n.type == 'permission_rejected') {
+            _pendingTicketRequests.remove('dev_$devId');
+            _rejectedDeviceRequests.add('dev_$devId');
+          } else if (n.type == 'permission_granted') {
+            _pendingTicketRequests.remove('dev_$devId');
+            _rejectedDeviceRequests.remove('dev_$devId');
+          }
+        }
+      }
     } catch (_) {}
   }
 
   bool hasRequestedTicket(int requestId) => _pendingTicketRequests.contains('req_$requestId');
 
   bool hasRequestedPermission(int deviceId) => _pendingTicketRequests.contains('dev_$deviceId');
+
+  bool isPermissionRejected(int deviceId) => _rejectedDeviceRequests.contains('dev_$deviceId');
+
+  void clearRejection(int deviceId) {
+    _rejectedDeviceRequests.remove('dev_$deviceId');
+    notifyListeners();
+  }
 
   Future<void> fetchPermissions() async {
     _isLoading = true;
@@ -186,6 +216,7 @@ class PermissionService extends ChangeNotifier {
       _pendingTicketRequests.add('req_$requestId');
     }
     _pendingTicketRequests.add('dev_$deviceId');
+    _rejectedDeviceRequests.remove('dev_$deviceId');
     notifyListeners();
 
     final notif = NotificationModel(
@@ -201,6 +232,24 @@ class PermissionService extends ChangeNotifier {
 
     await ApiService().sendNotification(notif);
     return true;
+  }
+
+  // Admin rejects permission request and notifies IT
+  Future<bool> rejectPermission({
+    required int notificationId,
+    required int itUserId,
+    required int deviceId,
+    String? reason,
+  }) async {
+    final success = await ApiService().rejectPermissionRequest(
+      notificationId: notificationId,
+      itUserId: itUserId,
+      deviceId: deviceId,
+      reason: reason,
+    );
+    await fetchPendingRequests();
+    notifyListeners();
+    return success;
   }
 
   // Admin revokes permission

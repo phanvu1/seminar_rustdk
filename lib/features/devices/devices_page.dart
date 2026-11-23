@@ -957,6 +957,7 @@ class _DevicesPageState extends State<DevicesPage> {
                           final isAdmin = auth.currentUser.role == UserRole.admin || auth.activeRole == UserRole.admin;
                           final hasPerm = isAdmin || permService.hasPermission(auth.currentUser.userId, dev.deviceId);
                           final hasRequested = permService.hasRequestedPermission(dev.deviceId);
+                          final isRejected = permService.isPermissionRejected(dev.deviceId);
 
                           return Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1021,10 +1022,21 @@ class _DevicesPageState extends State<DevicesPage> {
                                         ),
                                       );
                                     },
-                                    icon: Icon(hasRequested ? Icons.hourglass_top_rounded : Icons.vpn_key_rounded, size: 14),
-                                    label: Text(hasRequested ? 'Đã gửi yêu cầu' : 'Yêu cầu cấp quyền kết nối'),
+                                    icon: Icon(
+                                      hasRequested
+                                          ? Icons.hourglass_top_rounded
+                                          : (isRejected ? Icons.error_outline_rounded : Icons.vpn_key_rounded),
+                                      size: 14,
+                                    ),
+                                    label: Text(
+                                      hasRequested
+                                          ? 'Đã gửi yêu cầu'
+                                          : (isRejected ? 'Bị từ chối (Gửi lại)' : 'Yêu cầu cấp quyền kết nối'),
+                                    ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: hasRequested ? const Color(0xFFD97706) : const Color(0xFFF59E0B),
+                                      backgroundColor: hasRequested
+                                          ? const Color(0xFFD97706)
+                                          : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)),
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                     ),
@@ -1123,8 +1135,11 @@ class _DevicesPageState extends State<DevicesPage> {
                                   }
 
                                   final token = permService.generateSessionToken(auth.currentUser.userId, dev.deviceId);
+                                  final hasDirectIp = dev.ipAddress != null && dev.ipAddress!.trim().isNotEmpty;
                                   final launchResult = await VynexLauncherService.launchClient(
                                     vynexId: dev.vynexId,
+                                    ipAddress: dev.ipAddress,
+                                    preferDirectIp: hasDirectIp,
                                     token: token,
                                     itUserId: auth.currentUser.userId,
                                   );
@@ -1132,9 +1147,12 @@ class _DevicesPageState extends State<DevicesPage> {
                                   if (!mounted) return;
 
                                   if (launchResult.success) {
+                                    final routeDesc = hasDirectIp
+                                        ? 'trực tiếp qua IP nội bộ ${dev.ipAddress} (LAN / WireGuard - Siêu tốc)'
+                                        : 'qua Vynex ID ${dev.vynexId}';
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Đã kích hoạt Vynex Client (.exe) kết nối tới máy ${dev.name} (${dev.vynexId})'),
+                                        content: Text('Đã kích hoạt Vynex Client kết nối tới máy ${dev.name} $routeDesc'),
                                         backgroundColor: const Color(0xFF10B981),
                                       ),
                                     );

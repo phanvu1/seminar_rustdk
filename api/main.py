@@ -226,6 +226,12 @@ class PermissionGrant(BaseModel):
     duration_hours: Optional[int] = 24          # Mặc định cấp quyền 24h
     notes: Optional[str] = "Cấp quyền hỗ trợ kỹ thuật"
 
+class PermissionRejectRequest(BaseModel):
+    notification_id: int
+    it_user_id: int
+    device_id: int
+    reason: Optional[str] = "Admin từ chối yêu cầu cấp quyền"
+
 class SessionCreate(BaseModel):
     request_id: Optional[int] = 0
     it_user_id: int
@@ -1065,6 +1071,47 @@ def revoke_permission(id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/permissions/reject")
+def reject_permission_request(req: PermissionRejectRequest, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Admin từ chối yêu cầu cấp quyền và gửi thông báo trực tiếp tới IT"""
+    try:
+        # 1. Đánh dấu thông báo yêu cầu của Admin là đã đọc
+        db.execute(text("UPDATE Notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE notification_id = :nid"), {"nid": req.notification_id})
+
+        # 2. Lấy tên thiết bị
+        dev_row = db.execute(text("SELECT device_name FROM Devices WHERE device_id = :did"), {"did": req.device_id}).fetchone()
+        dname = dev_row[0] if dev_row else f"Thiết bị #{req.device_id}"
+
+        # 3. Tạo thông báo từ chối gửi cho IT
+        db.execute(text("""
+            INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+            VALUES (:uid, :t, :c, 'permission_rejected', :ref, 0, CURRENT_TIMESTAMP)
+        """), {
+            "uid": req.it_user_id,
+            "t": f"Yêu cầu quyền máy {dname} bị từ chối",
+            "c": f"Admin đã từ chối yêu cầu cấp quyền điều khiển máy {dname}. Lý do: {req.reason}",
+            "ref": req.device_id
+        })
+
+        # 4. Ghi ActivityLog
+        try:
+            db.execute(text("""
+                INSERT INTO ActivityLogs (user_id, device_id, action, description, ip_address, target_type, status)
+                VALUES (:uid, :did, 'PERMISSION_REJECTED', :desc, '127.0.0.1', 'PERMISSION', 'success')
+            """), {
+                "uid": current_user.get("user_id", 1),
+                "did": req.device_id,
+                "desc": f"Admin từ chối cấp quyền điều khiển máy {dname} cho IT #{req.it_user_id}"
+            })
+        except Exception:
+            pass
+
+        db.commit()
+        return {"message": "Đã từ chối yêu cầu cấp quyền và gửi thông báo tới IT thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.get("/api/permissions/check")
 @app.get("/api/permissions/verify")
 @app.get("/api/permissions/verify-access")
@@ -1240,7 +1287,7 @@ def get_notifications(user_id: Optional[int] = None, role: Optional[str] = None,
                 SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
                 FROM Notifications
                 WHERE type IN ('support_request', 'session_started', 'session_ended')
-                   OR (type IN ('permission_granted', 'permission_revoked', 'permission_request') AND (:uid = 0 OR user_id = :uid))
+                   OR (type IN ('permission_granted', 'permission_revoked', 'permission_request', 'permission_rejected') AND (:uid = 0 OR user_id = :uid))
                    OR (:uid != 0 AND user_id = :uid)
                 ORDER BY notification_id DESC
             """)

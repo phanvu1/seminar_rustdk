@@ -627,6 +627,43 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> rejectPermissionRequest({
+    required int notificationId,
+    required int itUserId,
+    required int deviceId,
+    String? reason,
+  }) async {
+    final urlsToTry = <String>[
+      _baseUrl,
+      if (_baseUrl != AppConstants.publicApiBaseUrl) AppConstants.publicApiBaseUrl,
+      if (_baseUrl != AppConstants.vpnApiBaseUrl) AppConstants.vpnApiBaseUrl,
+    ];
+
+    final body = {
+      'notification_id': notificationId,
+      'it_user_id': itUserId,
+      'device_id': deviceId,
+      'reason': reason ?? 'Admin từ chối yêu cầu cấp quyền',
+    };
+
+    for (final url in urlsToTry) {
+      try {
+        final uri = Uri.parse('$url/api/permissions/reject');
+        final res = await http
+            .post(uri, headers: _buildHeaders(), body: jsonEncode(body))
+            .timeout(AppConstants.apiTimeout);
+        if (res.statusCode == 200) {
+          _baseUrl = url;
+          _isBackendConnected = true;
+          return true;
+        }
+      } catch (e) {
+        debugPrint('[ApiService] rejectPermissionRequest error on $url: $e');
+      }
+    }
+    return false;
+  }
+
   // --- SESSIONS ---
   Future<List<RemoteSessionModel>> getSessions() async {
     try {

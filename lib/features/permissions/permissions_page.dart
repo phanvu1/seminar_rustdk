@@ -436,11 +436,20 @@ class _PermissionsPageState extends State<PermissionsPage> {
                             // Nút Từ chối
                             OutlinedButton(
                               onPressed: () async {
-                                await ApiService().markNotificationAsRead(req.notificationId);
+                                final permService = Provider.of<PermissionService>(context, listen: false);
+                                await permService.rejectPermission(
+                                  notificationId: req.notificationId,
+                                  itUserId: itUser.userId,
+                                  deviceId: device.deviceId,
+                                  reason: 'Admin từ chối yêu cầu kết nối thiết bị ${device.name}',
+                                );
                                 await _loadPendingRequests();
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Đã từ chối yêu cầu cấp quyền.')),
+                                  SnackBar(
+                                    content: Text('Đã từ chối và gửi thông báo tới ${itUser.fullName}!'),
+                                    backgroundColor: const Color(0xFFEF4444),
+                                  ),
                                 );
                               },
                               style: OutlinedButton.styleFrom(

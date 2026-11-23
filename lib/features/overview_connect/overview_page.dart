@@ -160,8 +160,11 @@ class _OverviewPageState extends State<OverviewPage> {
 
     final sessionToken = permService.generateSessionToken(auth.currentUser.userId, targetDeviceId);
     final inputPassword = _remotePasswordController.text.trim();
+    final hasDirectIp = device?.ipAddress != null && device!.ipAddress!.trim().isNotEmpty;
     final launchResult = await VynexLauncherService.launchClient(
       vynexId: targetVynexId,
+      ipAddress: device?.ipAddress,
+      preferDirectIp: hasDirectIp,
       token: sessionToken,
       itUserId: auth.currentUser.userId,
       password: inputPassword.isNotEmpty ? inputPassword : null,
