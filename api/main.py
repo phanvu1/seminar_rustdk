@@ -546,18 +546,18 @@ def delete_user(id: int, current_user: dict = Depends(require_admin), db: Sessio
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-# --- NHÓM 3: TRỤ SỞ & PHÒNG BAN (SỬA USER-03) ---
+# --- NHÓM 3: TRỤ SỞ & PHÒNG BAN ---
 
 @app.get("/api/branches")
-def get_branches():
-    """Hỗ trợ phân bổ 20 nhân sự vào 3 Trụ sở chính"""
-    return {
-        "data": [
-            {"branch_id": 1, "code": "BRANCH_A", "name": "Trụ sở A - Hà Nội (Trụ sở chính)", "ip_subnet": "10.13.13.0/24", "head": "admin_a"},
-            {"branch_id": 2, "code": "BRANCH_B", "name": "Trụ sở B - Đà Nẵng", "ip_subnet": "10.13.14.0/24", "head": "it_phuong_b"},
-            {"branch_id": 3, "code": "BRANCH_C", "name": "Trụ sở C - TP. Hồ Chí Minh", "ip_subnet": "10.13.15.0/24", "head": "it_thang_c"}
-        ]
-    }
+def get_branches(db: Session = Depends(get_db)):
+    """Lấy danh sách các Trụ sở từ cơ sở dữ liệu"""
+    try:
+        rows = db.execute(text("SELECT branch_id, code, name, address, ip_subnet FROM Branches ORDER BY branch_id ASC")).fetchall()
+        return {"data": [{
+            "branch_id": r[0], "code": r[1], "name": r[2], "address": r[3], "ip_subnet": r[4]
+        } for r in rows]}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
 
 @app.get("/api/departments")
 def get_departments(db: Session = Depends(get_db)):
@@ -569,6 +569,7 @@ def get_departments(db: Session = Depends(get_db)):
             FROM Departments d
             LEFT JOIN Users u ON d.manager_id = u.user_id
             WHERE d.deleted_at IS NULL
+            ORDER BY d.department_id ASC
         """)
         rows = db.execute(query).fetchall()
         return {"data": [{
@@ -581,11 +582,7 @@ def get_departments(db: Session = Depends(get_db)):
             "device_count": r[6] or 0
         } for r in rows]}
     except Exception as e:
-        return {"data": [
-            {"department_id": 1, "name": "Phòng Kỹ thuật & CNTT", "description": "Quản trị mạng & Hỗ trợ kỹ thuật", "member_count": 3, "device_count": 2},
-            {"department_id": 2, "name": "Phòng Kế toán - Tài chính", "description": "Tài chính & Kế toán", "member_count": 1, "device_count": 1},
-            {"department_id": 3, "name": "Phòng Kinh doanh & Tiếp thị", "description": "Bán hàng & Marketing", "member_count": 0, "device_count": 0}
-        ]}
+        return {"data": [], "error": str(e)}
 
 @app.post("/api/departments")
 def create_department(req: DepartmentCreate, db: Session = Depends(get_db)):
@@ -794,15 +791,17 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
         try:
             req_id_row = db.execute(text("SELECT LAST_INSERT_ID()")).fetchone()
             req_id = req_id_row[0] if req_id_row else None
-            notif_query = text("""
-                INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                VALUES (2, :t, :c, 'support_request', :ref, 0, CURRENT_TIMESTAMP)
-            """)
-            db.execute(notif_query, {
-                "t": f"Yêu cầu hỗ trợ mới #{req_id or ''}: {req.title}",
-                "c": f"Nhân viên ID #{req.employee_id} đã gửi yêu cầu: \"{req.title}\"",
-                "ref": req_id
-            })
+            it_users = db.execute(text("SELECT user_id FROM Users WHERE role_id IN (1, 2) AND deleted_at IS NULL")).fetchall()
+            for it_u in it_users:
+                db.execute(text("""
+                    INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                    VALUES (:uid, :t, :c, 'support_request', :ref, 0, CURRENT_TIMESTAMP)
+                """), {
+                    "uid": it_u[0],
+                    "t": f"Yêu cầu hỗ trợ mới #{req_id or ''}: {req.title}",
+                    "c": f"Nhân viên ID #{req.employee_id} đã gửi yêu cầu: \"{req.title}\"",
+                    "ref": req_id
+                })
             db.commit()
         except Exception:
             pass
@@ -813,9 +812,10 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/support-requests/{id}/accept")
-def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depends(get_db)):
+def accept_support_request(id: int, it_id: Optional[int] = None, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """IT tiếp nhận hoặc Admin chỉ định xử lý yêu cầu hỗ trợ"""
     try:
+        assigned_it = it_id or current_user.get("user_id") or 1
         query = text("""
             UPDATE SupportRequests 
             SET status = IF(status = 'pending', 'accepted', status),
@@ -823,7 +823,7 @@ def accept_support_request(id: int, it_id: Optional[int] = 2, db: Session = Depe
                 accepted_at = IF(accepted_at IS NULL, CURRENT_TIMESTAMP, accepted_at)
             WHERE request_id = :id
         """)
-        res = db.execute(query, {"id": id, "it": it_id})
+        res = db.execute(query, {"id": id, "it": assigned_it})
         db.commit()
 
         # Gửi thông báo cho Nhân viên tạo ticket
@@ -987,7 +987,7 @@ def get_permissions(db: Session = Depends(get_db)):
         return {"data": [], "error": str(e)}
 
 @app.post("/api/permissions")
-def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
+def grant_permission(req: PermissionGrant, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Admin cấp quyền truy cập thiết bị có thời hạn (Mặc định 24h)"""
     try:
         # BẢO VỆ ADMIN: Không bao giờ cấp quyền điều khiển máy của Admin cho người khác
@@ -995,12 +995,14 @@ def grant_permission(req: PermissionGrant, db: Session = Depends(get_db)):
         if dev_chk and dev_chk[0] == 1:
             raise HTTPException(status_code=400, detail="Chính sách bảo mật: Không thể cấp quyền điều khiển máy tính của Quản Trị Viên (Admin) cho bất kỳ ai!")
 
+        granter_id = current_user.get("user_id", 1)
         query = text("""
             INSERT INTO Permissions (user_id, device_id, permission_type, granted_by, granted_at, expires_at, status, notes)
-            VALUES (:uid, :did, :ptype, 1, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL :hours HOUR), 1, :notes)
+            VALUES (:uid, :did, :ptype, :granter, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL :hours HOUR), 1, :notes)
         """)
         db.execute(query, {
             "uid": req.user_id, "did": req.device_id, "ptype": req.permission_type,
+            "granter": granter_id,
             "hours": req.duration_hours, "notes": req.notes
         })
         db.commit()
@@ -1157,7 +1159,10 @@ def start_session(req: SessionCreate, db: Session = Depends(get_db)):
     try:
         tdev = req.target_device_id or req.device_id or 1
         sdev = req.source_device_id or 2
-        target = req.target_user_id or 4
+        target = req.target_user_id
+        if not target and tdev:
+            owner_row = db.execute(text("SELECT user_id FROM Devices WHERE device_id = :did"), {"did": tdev}).fetchone()
+            target = owner_row[0] if owner_row else 1
 
         # BẢO VỆ ADMIN: Chặn phiên kết nối vào máy Admin nếu người khởi tạo không phải Admin
         dev_chk = db.execute(text("SELECT user_id FROM Devices WHERE device_id = :did"), {"did": tdev}).fetchone()
@@ -1218,6 +1223,11 @@ def get_notifications(user_id: Optional[int] = None, role: Optional[str] = None,
     """
     try:
         norm_role = (role or "").lower()
+        if user_id and not norm_role:
+            u_role = db.execute(text("SELECT role_id FROM Users WHERE user_id = :uid"), {"uid": user_id}).fetchone()
+            if u_role:
+                norm_role = "admin" if u_role[0] == 1 else ("it" if u_role[0] == 2 else "employee")
+
         if norm_role == "admin" or (user_id == 1 and not norm_role):
             query = text("""
                 SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
@@ -1225,7 +1235,7 @@ def get_notifications(user_id: Optional[int] = None, role: Optional[str] = None,
                 ORDER BY notification_id DESC
             """)
             rows = db.execute(query).fetchall()
-        elif norm_role in ["it", "it_staff"] or user_id == 2:
+        elif norm_role in ["it", "it_staff"]:
             query = text("""
                 SELECT notification_id, user_id, title, content, type, reference_id, is_read, created_at
                 FROM Notifications
