@@ -235,18 +235,27 @@ class ApiService extends ChangeNotifier {
   }
 
   Future<bool> updateUser(int id, Map<String, dynamic> data) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/api/users/$id');
-      final res = await http
-          .put(uri, headers: _buildHeaders(), body: jsonEncode(data))
-          .timeout(AppConstants.apiTimeout);
-      if (res.statusCode == 200) {
-        _isBackendConnected = true;
-        await getUsers();
-        return true;
+    final urlsToTry = <String>[
+      _baseUrl,
+      if (_baseUrl != AppConstants.publicApiBaseUrl) AppConstants.publicApiBaseUrl,
+      if (_baseUrl != AppConstants.vpnApiBaseUrl) AppConstants.vpnApiBaseUrl,
+    ];
+
+    for (final url in urlsToTry) {
+      try {
+        final uri = Uri.parse('$url/api/users/$id');
+        final res = await http
+            .put(uri, headers: _buildHeaders(), body: jsonEncode(data))
+            .timeout(AppConstants.apiTimeout);
+        if (res.statusCode == 200) {
+          _baseUrl = url;
+          _isBackendConnected = true;
+          await getUsers();
+          return true;
+        }
+      } catch (e) {
+        debugPrint('[ApiService] updateUser fallback on $url due to: $e');
       }
-    } catch (e) {
-      debugPrint('[ApiService] updateUser fallback due to: $e');
     }
     // Fallback MockDataService
     final idx = MockDataService().users.indexWhere((u) => u.userId == id);
@@ -269,6 +278,36 @@ class ApiService extends ChangeNotifier {
       notifyListeners();
     }
     return true;
+  }
+
+  Future<bool> resetPassword(int id, String newPassword) async {
+    final cleanP = newPassword.trim();
+    if (cleanP.isEmpty) return false;
+
+    final urlsToTry = <String>[
+      _baseUrl,
+      if (_baseUrl != AppConstants.publicApiBaseUrl) AppConstants.publicApiBaseUrl,
+      if (_baseUrl != AppConstants.vpnApiBaseUrl) AppConstants.vpnApiBaseUrl,
+    ];
+
+    for (final url in urlsToTry) {
+      try {
+        final uri = Uri.parse('$url/api/users/$id/password');
+        final res = await http
+            .put(uri, headers: _buildHeaders(), body: jsonEncode({'new_password': cleanP}))
+            .timeout(AppConstants.apiTimeout);
+        if (res.statusCode == 200) {
+          _baseUrl = url;
+          _isBackendConnected = true;
+          await getUsers();
+          return true;
+        }
+      } catch (e) {
+        debugPrint('[ApiService] resetPassword on $url error: $e');
+      }
+    }
+    // Thử thêm đường dẫn updateUser truyền thống
+    return updateUser(id, {'password_hash': cleanP});
   }
 
   Future<bool> deleteUser(int id) async {

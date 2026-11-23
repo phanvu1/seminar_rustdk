@@ -370,14 +370,19 @@ class _UsersDeptsPageState extends State<UsersDeptsPage> with SingleTickerProvid
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amber[700], foregroundColor: Colors.white),
               onPressed: () async {
-                if (passController.text.trim().isEmpty) return;
+                final newPass = passController.text.trim();
+                if (newPass.isEmpty) return;
                 Navigator.pop(ctx);
-                await api.updateUser(user.userId, {
-                  'password_hash': passController.text.trim(),
-                });
+                final ok = await api.resetPassword(user.userId, newPass);
                 if (!mounted) return;
+                _fetchData();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Đã đặt lại mật khẩu cho @${user.username} thành công!')),
+                  SnackBar(
+                    backgroundColor: ok ? Colors.green[700] : Colors.red[700],
+                    content: Text(ok
+                        ? 'Đã đặt lại mật khẩu cho @${user.username} thành công!'
+                        : 'Không thể đặt lại mật khẩu cho @${user.username}!'),
+                  ),
                 );
               },
               child: const Text('Xác Nhận Đổi'),

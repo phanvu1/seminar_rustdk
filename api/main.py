@@ -183,6 +183,9 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     password_hash: Optional[str] = None
 
+class PasswordResetRequest(BaseModel):
+    new_password: str
+
 class DepartmentCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -283,34 +286,61 @@ def root(db: Session = Depends(get_db)):
 @app.post("/api/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     """
-    Sửa lỗi AUTH-05 (P0): Bắt buộc kiểm tra status = 'active'.
-    Tài khoản 'inactive' hoặc 'locked' bị từ chối với HTTP 403.
-    Hỗ trợ alias tên đăng nhập linh hoạt (it, it2, it_nam, kt_mai, nhanvien).
+    Xác thực đăng nhập hệ thống:
+    1. Ưu tiên tìm kiếm trực tiếp theo username, email hoặc số điện thoại.
+    2. Fallback alias chỉ áp dụng khi KHÔNG tìm thấy tài khoản trực tiếp (tránh ghi đè tài khoản thực tế như mai).
+    3. Hỗ trợ mật khẩu cập nhật trong database hoặc mật khẩu master mặc định ('123', '123456') cho môi trường lab.
+    4. Kiểm tra trạng thái tài khoản ('active').
+    5. Trả về JWT token và thông tin đầy đủ người dùng kèm phòng ban.
     """
     raw_u = req.username.strip().lower()
-    if raw_u in ("it2", "it_nam", "nam", "lehoangnam"):
-        target_u = "it2"
-    elif raw_u in ("it", "it1", "it_support", "tranthib"):
-        target_u = "it"
-    elif raw_u in ("nhanvien", "kt_mai", "mai", "ketoan", "phamthimai"):
-        target_u = "nhanvien"
-    elif raw_u in ("admin", "quantri", "nguyenvanan"):
-        target_u = "admin"
-    else:
-        target_u = raw_u
+    input_p = req.password.strip()
 
+    # Bước 1: Tìm kiếm trực tiếp theo username / email / phone
     query = text("""
-        SELECT user_id, username, full_name, role_id, status, department_id 
-        FROM Users 
-        WHERE username = :u AND (password_hash = :p OR :p IN ('123', '123456')) AND deleted_at IS NULL
+        SELECT u.user_id, u.username, u.full_name, u.role_id, u.status, u.department_id, 
+               u.password_hash, u.email, u.phone, d.name as department_name
+        FROM Users u
+        LEFT JOIN Departments d ON u.department_id = d.department_id
+        WHERE (LOWER(u.username) = :u OR LOWER(u.email) = :u OR u.phone = :u) AND u.deleted_at IS NULL
     """)
-    user = db.execute(query, {"u": target_u, "p": req.password.strip()}).fetchone()
+    user = db.execute(query, {"u": raw_u}).fetchone()
+
+    # Bước 2: Fallback cho alias demo chỉ khi không có tài khoản trực tiếp
+    if not user:
+        alias_candidates = []
+        if raw_u in ("admin", "quantri", "nguyenvanan"):
+            alias_candidates = ["admin"]
+        elif raw_u in ("it2", "it_nam", "nam", "lehoangnam"):
+            alias_candidates = ["it2", "nam", "dabeo", "dat"]
+        elif raw_u in ("it", "it1", "it_support", "tranthib"):
+            alias_candidates = ["it", "it1", "dabeo", "dat"]
+        elif raw_u in ("nhanvien", "kt_mai", "ketoan", "phamthimai"):
+            alias_candidates = ["mai", "giagia", "nhanvien"]
+
+        for cand in alias_candidates:
+            user = db.execute(query, {"u": cand}).fetchone()
+            if user:
+                break
+
     if not user:
         raise HTTPException(status_code=401, detail="Sai tài khoản hoặc mật khẩu")
         
-    user_id, username, full_name, role_id, user_status, dept_id = user
+    user_id, username, full_name, role_id, user_status, dept_id, stored_hash, email, phone, dept_name = user
     
-    # SỬA LỖI AUTH-05 (P0): Chặn tài khoản bị khóa / vô hiệu hóa
+    # Bước 3: Xác thực mật khẩu
+    password_valid = False
+    if stored_hash and stored_hash.strip() == input_p:
+        password_valid = True
+    elif input_p in ("123", "123456"):
+        password_valid = True
+    elif not stored_hash and input_p == "123":
+        password_valid = True
+
+    if not password_valid:
+        raise HTTPException(status_code=401, detail="Sai tài khoản hoặc mật khẩu")
+
+    # Bước 4: Chặn tài khoản bị khóa / vô hiệu hóa
     if user_status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -319,7 +349,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         
     role_name = "admin" if role_id == 1 else ("it" if role_id == 2 else "user")
     
-    # Sinh JWT Token thực thụ (RFC 7519)
+    # Bước 5: Sinh JWT Token thực thụ (RFC 7519)
     token = create_jwt_token({
         "user_id": user_id,
         "username": username,
@@ -327,6 +357,16 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         "role_id": role_id,
         "role_name": role_name
     })
+
+    # Ghi nhận log đăng nhập
+    try:
+        db.execute(text("""
+            INSERT INTO ActivityLogs (user_id, action, description, ip_address, target_type, status)
+            VALUES (:uid, 'LOGIN', :desc, '127.0.0.1', 'USER', 'success')
+        """), {"uid": user_id, "desc": f"Người dùng @{username} ({full_name}) đăng nhập thành công"})
+        db.commit()
+    except Exception:
+        pass
     
     return {
         "message": "Đăng nhập thành công",
@@ -338,6 +378,9 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             "role_id": role_id,
             "role_name": role_name,
             "department_id": dept_id,
+            "department_name": dept_name or "Phòng ban",
+            "email": email,
+            "phone": phone,
             "status": user_status
         }
     }
@@ -405,7 +448,7 @@ def create_user(req: UserCreate, db: Session = Depends(get_db)):
 
 @app.put("/api/users/{id}")
 def update_user(id: int, req: UserUpdate, db: Session = Depends(get_db)):
-    """Cập nhật thông tin người dùng (Họ tên, Vai trò, Phòng ban, Trạng thái...)"""
+    """Cập nhật thông tin người dùng (Họ tên, Vai trò, Phòng ban, Trạng thái, Mật khẩu...)"""
     try:
         updates = []
         params = {"id": id}
@@ -428,17 +471,65 @@ def update_user(id: int, req: UserUpdate, db: Session = Depends(get_db)):
         if req.status is not None:
             updates.append("status = :s")
             params["s"] = req.status
-        if req.password_hash is not None:
+        if req.password_hash is not None and req.password_hash.strip():
             updates.append("password_hash = :p")
-            params["p"] = req.password_hash
+            params["p"] = req.password_hash.strip()
 
         if not updates:
             return {"message": "Không có thông tin nào cần thay đổi"}
 
+        updates.append("updated_at = CURRENT_TIMESTAMP")
         query_str = f"UPDATE Users SET {', '.join(updates)} WHERE user_id = :id AND deleted_at IS NULL"
         db.execute(text(query_str), params)
+
+        try:
+            desc = "Cập nhật thông tin người dùng"
+            if req.password_hash is not None:
+                desc = "Cập nhật mật khẩu và thông tin người dùng"
+            db.execute(text("""
+                INSERT INTO ActivityLogs (user_id, action, description, ip_address, target_type, status)
+                VALUES (:uid, 'USER_UPDATED', :desc, '127.0.0.1', 'USER', 'success')
+            """), {"uid": id, "desc": desc})
+        except Exception:
+            pass
+
         db.commit()
         return {"message": f"Cập nhật người dùng ID {id} thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/users/{id}/password")
+@app.post("/api/users/{id}/reset-password")
+def reset_password(id: int, req: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Đặt lại mật khẩu cho người dùng"""
+    try:
+        new_p = req.new_password.strip()
+        if not new_p:
+            raise HTTPException(status_code=400, detail="Mật khẩu mới không được để trống")
+        
+        query = text("""
+            UPDATE Users 
+            SET password_hash = :p, updated_at = CURRENT_TIMESTAMP 
+            WHERE user_id = :id AND deleted_at IS NULL
+        """)
+        res = db.execute(query, {"id": id, "p": new_p})
+        if res.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+            
+        try:
+            db.execute(text("""
+                INSERT INTO ActivityLogs (user_id, action, description, ip_address, target_type, status)
+                VALUES (:uid, 'PASSWORD_RESET', 'Đặt lại mật khẩu tài khoản thành công', '127.0.0.1', 'USER', 'success')
+            """), {"uid": id})
+        except Exception:
+            pass
+            
+        db.commit()
+        return {"message": "Đặt lại mật khẩu thành công", "user_id": id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
