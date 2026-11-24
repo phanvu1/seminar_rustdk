@@ -94,11 +94,54 @@ echo "$CONFIG_CONTENT" > "$HOME/.config/rustdesk/RustDesk2.toml"
 # Khởi động lại service client
 sudo systemctl restart rustdesk 2>/dev/null || true
 
+# 6. Thiết lập quyền thực thi cho các script khởi chạy
+chmod +x "$SCRIPT_DIR/run_manager.sh" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/run_vynex.sh" 2>/dev/null || true
+
+# 7. Tạo shortcut trên Desktop cho Vynex Manager & Vynex Client
+TARGET_USER="${SUDO_USER:-$USER}"
+USER_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+DESKTOP_DIR="$USER_HOME/Desktop"
+
+if [ -d "$DESKTOP_DIR" ]; then
+    cat << EOF > "$DESKTOP_DIR/Vynex_Manager.desktop"
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Vynex Manager
+Comment=Cổng hỗ trợ và gửi Ticket Vynex Enterprise
+Exec=bash -c "cd '$SCRIPT_DIR/Manager' && flutter run -d linux"
+Icon=utilities-system-monitor
+Terminal=true
+Categories=Utility;Application;
+EOF
+
+    cat << EOF > "$DESKTOP_DIR/Vynex_Client.desktop"
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Vynex Client
+Comment=Điều khiển từ xa Vynex Remote Desktop
+Exec=rustdesk
+Icon=rustdesk
+Terminal=false
+Categories=Network;RemoteAccess;
+EOF
+
+    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/Vynex_Manager.desktop" "$DESKTOP_DIR/Vynex_Client.desktop" 2>/dev/null || true
+    chmod +x "$DESKTOP_DIR/Vynex_Manager.desktop" "$DESKTOP_DIR/Vynex_Client.desktop" 2>/dev/null || true
+fi
+
 echo "=========================================================="
-echo "    CÀI ĐẶT THÀNH CÔNG VYNEX CLIENT CHO UBUNTU LINUX!     "
-echo "  - Chứng chỉ đã nạp: $(basename "$CONF_FILE")            "
-echo "  - Máy chủ kết nối: VPS Cloud 10.13.13.1                  "
-echo "  - Relay Server: 10.13.13.1:21117                         "
-echo "  - API Server: http://34.87.182.49:8000                   "
-echo "  - Phần mềm Vynex Client hiện đã sẵn sàng (Chấm xanh)     "
+echo "    CÀI ĐẶT THÀNH CÔNG VYNEX ENTERPRISE (UBUNTU / LINUX)! "
+echo "  - Hầm VPN WireGuard: 10.13.13.3 (Kích hoạt sẵn sàng)     "
+echo "  - Vynex Client Engine: Đã cấu hình máy chủ VPS 10.13.13.1"
+echo "  - Vynex Manager Dashboard: Đã tích hợp đầy đủ            "
+echo "                                                          "
+echo "  * ĐỂ MỞ VYNEX MANAGER:                                  "
+echo "    Chạy lệnh: ./run_manager.sh (hoặc click icon Desktop) "
+echo "  * ĐỂ MỞ VYNEX CLIENT:                                   "
+echo "    Chạy lệnh: rustdesk &                                 "
+echo "  * MENU TỔNG HỢP:                                        "
+echo "    Chạy lệnh: ./run_vynex.sh                             "
 echo "=========================================================="
