@@ -97,8 +97,6 @@ class VynexLauncherService {
   /// Khởi chạy Vynex Client với các tham số ủy quyền bảo mật
   static Future<VynexLaunchResult> launchClient({
     required String vynexId,
-    String? ipAddress,
-    bool preferDirectIp = false,
     required String token,
     int? itUserId,
     String? password,
@@ -118,12 +116,10 @@ class VynexLauncherService {
     try {
       final workingDir = File(clientExe).parent.path;
       final cleanId = vynexId.replaceAll(' ', '');
-      final cleanIp = ipAddress?.trim() ?? '';
-      final isDirect = preferDirectIp && cleanIp.isNotEmpty;
-      final target = isDirect ? cleanIp : cleanId;
+      final target = cleanId;
 
       debugPrint(
-          '[Vynex Launcher] Khởi chạy: $clientExe trong thư mục: $workingDir --connect $target (isDirect=$isDirect, fileTransfer=$isFileTransfer)');
+          '[Vynex Launcher] Khởi chạy: $clientExe trong thư mục: $workingDir --connect $target (fileTransfer=$isFileTransfer)');
 
       final actionFlag = isFileTransfer ? '--file-transfer' : '--connect';
       final args = [
@@ -152,7 +148,7 @@ class VynexLauncherService {
       );
 
       final modeText = isFileTransfer ? 'phiên Truyền Tệp' : 'phiên Điều Khiển Màn Hình';
-      final targetText = isDirect ? 'IP nội bộ $cleanIp (Direct LAN/VPN)' : 'Vynex ID $cleanId';
+      final targetText = 'Vynex ID $cleanId';
       return VynexLaunchResult(
         success: true,
         message: 'Đã khởi chạy Vynex Client ($modeText) tới $targetText thành công.',

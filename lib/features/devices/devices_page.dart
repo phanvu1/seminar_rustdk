@@ -1135,11 +1135,8 @@ class _DevicesPageState extends State<DevicesPage> {
                                   }
 
                                   final token = permService.generateSessionToken(auth.currentUser.userId, dev.deviceId);
-                                  final hasDirectIp = dev.ipAddress != null && dev.ipAddress!.trim().isNotEmpty;
                                   final launchResult = await VynexLauncherService.launchClient(
                                     vynexId: dev.vynexId,
-                                    ipAddress: dev.ipAddress,
-                                    preferDirectIp: hasDirectIp,
                                     token: token,
                                     itUserId: auth.currentUser.userId,
                                   );
@@ -1147,12 +1144,9 @@ class _DevicesPageState extends State<DevicesPage> {
                                   if (!mounted) return;
 
                                   if (launchResult.success) {
-                                    final routeDesc = hasDirectIp
-                                        ? 'trực tiếp qua IP nội bộ ${dev.ipAddress} (LAN / WireGuard - Siêu tốc)'
-                                        : 'qua Vynex ID ${dev.vynexId}';
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Đã kích hoạt Vynex Client kết nối tới máy ${dev.name} $routeDesc'),
+                                        content: Text('Đã kích hoạt Vynex Client kết nối tới máy ${dev.name} qua Vynex ID ${dev.vynexId} (P2P NAT Punch & Relay)'),
                                         backgroundColor: const Color(0xFF10B981),
                                       ),
                                     );
