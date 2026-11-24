@@ -29,7 +29,13 @@ Sự can thiệp chỉ diễn ra tại 4 tầng ngoại vi:
 - rustdesk/flutter/lib/vynex_permission_guard.dart (TỆP MỚI): Chốt chặn bảo mật Zero-Trust với Backend
 
 ================================================================================
-2. CHI TIẾT UNIFIED DIFF
+2. CÁC CỔNG MẠNG VÀ CƠ CHẾ KẾT NỐI TRÊN MÁY CHỦ VPS
 ================================================================================
-Xem báo cáo chi tiết đầy đủ với code so sánh từng dòng tại:
-docs/RUSTDESK_CHANGES_AND_DIFF.md
+- Cổng 21115 (TCP): NAT Type Test (Kiểm tra phân loại NAT)
+- Cổng 21116 (UDP/TCP): Rendezvous Server (Đăng ký ID, Heartbeat và Đục lỗ NAT)
+- Cổng 21117 (TCP): Relay Server (Trạm trung chuyển dữ liệu khi P2P thất bại)
+- Cổng 21118 (TCP): Direct IP Server (Kết nối siêu tốc cùng mạng LAN / VPN < 5ms)
+- Cổng 8000 (TCP): FastAPI Backend (Quản lý User, RBAC, kiểm tra quyền & thông báo)
+- Cổng 51820 (UDP): WireGuard VPN Server (Dải mạng an toàn 10.13.13.0/24)
+
+Chi tiết Unified Diff và giải trình xem tại: docs/RUSTDESK_CHANGES_AND_DIFF.md

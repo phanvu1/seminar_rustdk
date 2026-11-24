@@ -206,7 +206,8 @@ class DeviceCreate(BaseModel):
     os_name: Optional[str] = "Windows 11 Pro"
 
 class SupportRequestCreate(BaseModel):
-    employee_id: int
+    employee_id: Optional[int] = None
+    user_id: Optional[int] = None
     device_id: int
     title: str
     description: Optional[str] = ""
@@ -779,13 +780,16 @@ def get_support_requests(db: Session = Depends(get_db)):
 def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_db)):
     """Nhân viên hoặc IT gửi yêu cầu hỗ trợ kỹ thuật mới"""
     try:
+        emp_id = req.employee_id or req.user_id
+        if not emp_id:
+            raise HTTPException(status_code=400, detail="Thiếu ID nhân viên (employee_id hoặc user_id)")
         final_status = req.status or ("accepted" if req.assigned_it_id else "pending")
         query = text("""
             INSERT INTO SupportRequests (employee_id, device_id, title, description, client_password, priority, status, assigned_it_id, accepted_at)
             VALUES (:emp, :dev, :t, :d, :cp, :p, :st, :it, :acc)
         """)
         db.execute(query, {
-            "emp": req.employee_id, "dev": req.device_id, "t": req.title,
+            "emp": emp_id, "dev": req.device_id, "t": req.title,
             "d": req.description, "cp": req.client_password, "p": req.priority,
             "st": final_status,
             "it": req.assigned_it_id,
@@ -794,6 +798,7 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
         db.commit()
 
         # Tự động gửi thông báo cho IT Staff và Admin
+        req_id = None
         try:
             req_id_row = db.execute(text("SELECT LAST_INSERT_ID()")).fetchone()
             req_id = req_id_row[0] if req_id_row else None
@@ -805,14 +810,17 @@ def create_support_request(req: SupportRequestCreate, db: Session = Depends(get_
                 """), {
                     "uid": it_u[0],
                     "t": f"Yêu cầu hỗ trợ mới #{req_id or ''}: {req.title}",
-                    "c": f"Nhân viên ID #{req.employee_id} đã gửi yêu cầu: \"{req.title}\"",
+                    "c": f"Nhân viên ID #{emp_id} đã gửi yêu cầu: \"{req.title}\"",
                     "ref": req_id
                 })
             db.commit()
         except Exception:
             pass
 
-        return {"message": "Gửi yêu cầu hỗ trợ thành công. Kỹ thuật viên IT sẽ tiếp nhận xử lý."}
+        return {
+            "message": "Gửi yêu cầu hỗ trợ thành công. Kỹ thuật viên IT sẽ tiếp nhận xử lý.",
+            "request_id": req_id
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))

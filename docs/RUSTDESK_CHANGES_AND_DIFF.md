@@ -152,6 +152,27 @@ if (curId.isEmpty || curId.startsWith('192.168.') || curId == '34.87.182.49') {
 }
 ```
 
+### 5.2. Cấu hình Direct Server (TCP Cổng 21118) cho kết nối cùng mạng
+Khi hai máy ở cùng mạng nội bộ (LAN) hoặc cùng kết nối VPN WireGuard (`10.13.13.0/24`):
+* Cấu hình trong `Vynex2.toml` (Windows & Ubuntu Linux):
+  ```toml
+  direct-server = 'Y'
+  direct-access-port = '21118'
+  ```
+* **Cơ chế hoạt động:** Vynex Launcher (`vynex_launcher_service.dart`) phát hiện máy đích có cùng subnet (`10.13.13.x`), truyền thẳng tham số `--connect <IP>` vào client RustDesk.
+* Client kết nối thẳng vào cổng TCP `21118` của máy đích, **bỏ qua hoàn toàn bước chờ đục lỗ NAT qua cổng 21116 và không qua server trung gian relay 21117**, giúp hiển thị màn hình gần như tức thì (< 5ms).
+
+### 5.3. Bảng danh mục toàn bộ Cổng mạng & Dịch vụ trên VPS
+| Cổng | Giao thức | Dịch vụ | Chức năng chi tiết |
+|---|---|---|---|
+| **`21115`** | TCP | `hbbs` | NAT Type Test - Kiểm tra loại NAT của client khi khởi động |
+| **`21116`** | **UDP / TCP** | `hbbs` | Rendezvous Server - Đăng ký ID, Heartbeat và Đục lỗ NAT |
+| **`21117`** | TCP | `hbbr` | Relay Server - Trạm trung chuyển dữ liệu khi P2P thất bại |
+| **`21118`** | TCP | `RustDesk Client` | Direct IP Server - Kết nối siêu tốc cùng mạng LAN / VPN |
+| **`8000`** | TCP | `vynex_api` | FastAPI Backend - Quản lý tài khoản, RBAC, kiểm tra quyền & thông báo |
+| **`51820`**| UDP | `wireguard` | Máy chủ VPN WireGuard bảo vệ mạng nội bộ doanh nghiệp |
+| **`3306`** | TCP | `vynex_db` | MySQL Database v3 lưu trữ Users, Devices, Permissions, Logs |
+
 ---
 
 ## 6. BẢNG ĐỐI CHIẾU UNIFIED DIFF CHI TIẾT TỪNG TỆP
