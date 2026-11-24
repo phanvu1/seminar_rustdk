@@ -79,14 +79,11 @@ Admin mở ứng dụng **Vynex Manager** trên máy Windows:
 Mở Terminal trên Ubuntu và chạy các lệnh sau:
 
 ```bash
-# 1. Tạo thư mục và giải nén gói cài đặt
+# 1. Tải và giải nén (hoặc giải nén từ thư mục Downloads nếu đã tải qua trình duyệt)
 mkdir -p ~/vynex_install && cd ~/vynex_install
-tar -xzf /path/to/Vynex_Enterprise_Linux_v2.0.tar.gz -C .
+tar -xzf ~/Downloads/Vynex_Enterprise_Linux_v2.0.tar.gz -C . 2>/dev/null || tar -xzf Vynex_Enterprise_Linux_v2.0.tar.gz -C .
 
-# 2. Đặt file chứng chỉ VPN của Mai vào cùng thư mục này
-cp /path/to/peer2_Employee_Ubuntu.conf .
-
-# 3. Phân quyền và chạy script cài đặt tự động
+# 2. Phân quyền và chạy script cài đặt tự động (Chứng chỉ peer2_Employee_Ubuntu.conf đã tích hợp sẵn bên trong gói)
 chmod +x install.sh
 sudo ./install.sh
 ```
@@ -94,21 +91,20 @@ sudo ./install.sh
 **Script `install.sh` sẽ tự động 100%:**
 * Cài đặt WireGuard VPN và nạp IP `10.13.13.3`.
 * Cài đặt RustDesk Engine bản Linux.
-* Tự động tiêm cấu hình Server VPS Cloud `10.13.13.1`, Public Key bảo mật.
-* **Tự động kích hoạt cổng kết nối siêu tốc nội bộ:** `direct-server = 'Y'`, cổng `21118`.
+* Tự động tiêm cấu hình Server VPS Cloud `10.13.13.1`, Relay `10.13.13.1:21117`, Public Key bảo mật.
 * Đổi tên ứng dụng thành **Vynex Client** trên menu Ubuntu.
 
 ---
 
 ## GIAI ĐOẠN 4: KỊCH BẢN KIỂM THỬ THỰC TẾ GIỮA 3 MÁY (TEST SCENARIOS)
 
-### Kịch bản 1: Kiểm thử kết nối siêu tốc cùng mạng (Direct IP Port 21118)
+### Kịch bản 1: Kiểm thử kết nối P2P NAT Hole Punching & Relay qua Vynex ID
 1. Trên máy Đạt (IT - `10.13.13.4`), vào mục **"Quản lý thiết bị"**.
 2. Chọn máy **Mai (Ubuntu - `10.13.13.3`)** -> Bấm **"Kết Nối Ngay"**.
 3. **Kết quả mong đợi:** 
-   * Vynex Launcher nhận diện máy Mai có IP `10.13.13.3` (cùng subnet WireGuard `10.13.13.x`).
-   * Launcher tự động gọi RustDesk kết nối thẳng cổng `21118` của máy Mai.
-   * Màn hình Ubuntu hiện lên **ngay lập tức** (< 5ms), không bị chờ đục lỗ NAT.
+   * Vynex Launcher gọi Vynex Client kết nối tới Vynex ID (9 chữ số) của máy Mai.
+   * Client bắt tay Rendezvous Server `10.13.13.1:21116`, đục lỗ NAT P2P trực tiếp qua UDP (hoặc tự động chuyển tiếp Relay `10.13.13.1:21117`).
+   * Màn hình Ubuntu hiện lên mượt mà và ổn định.
 
 ### Kịch bản 2: Kiểm thử Chính sách Bảo vệ Admin (Unidirectional Guard)
 1. Trên máy Đạt (IT), thử bấm kết nối vào máy **`PC-IT-ADMIN (Host Windows)`**.

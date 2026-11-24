@@ -2,19 +2,40 @@
        HƯỚNG DẪN SỬ DỤNG HỆ THỐNG VYNEX ENTERPRISE REMOTE DESKTOP
 ========================================================================
 
-1. DÀNH CHO MÁY NHÂN VIÊN (CLIENT):
-   - Để nhận hỗ trợ điều khiển từ xa từ Kỹ thuật viên IT:
-     -> Chạy file: "Vynex_Nhan_Vien.bat"
-   - Cửa sổ Vynex Client sẽ hiện ID và Mật khẩu dùng một lần (One-Time Password).
-   - Đọc ID và Mật khẩu cho IT để IT kết nối vào hỗ trợ.
+A. THIẾT LẬP KẾT NỐI MẠNG AN TOÀN WIREGUARD (BẮT BUỘC TRƯỚC KHI DÙNG):
+   1. Cài đặt phần mềm WireGuard cho Windows:
+      -> Tải tại: https://www.wireguard.com/install/
+   2. Mở WireGuard -> Chọn "Add Tunnel" (Thêm hầm) -> Duyệt vào thư mục:
+      -> "VPN_Configs\"
+      * Nếu bạn là IT Đạt: Chọn file "peer3_IT_Dat.conf" (IP: 10.13.13.4)
+      * Nếu bạn là Admin: Chọn file "peer1_Admin.conf" (IP: 10.13.13.2)
+   3. Bấm nút "Activate" (Kích hoạt). Khi thấy biểu tượng xanh lá cây là thành công!
 
-2. DÀNH CHO MÁY QUẢN TRỊ VIÊN / KỸ THUẬT VIÊN IT:
-   - Để quản lý thiết bị, duyệt quyền truy cập và điều khiển máy nhân viên:
-     -> Chạy file: "Vynex_Quan_Tri_IT.bat"
-   - Hệ thống sẽ mở cả Vynex Client Engine và Bảng điều khiển Quản trị (Manager).
-   - Đăng nhập bằng tài khoản IT hoặc Admin được cấp.
+------------------------------------------------------------------------
 
-3. KHỞI CHẠY CHUNG:
-   - Bạn cũng có thể chạy file "run_vynex.bat" và chọn [1] hoặc [2] theo nhu cầu.
+B. DÀNH CHO MÁY KỸ THUẬT VIÊN IT (MÁY ĐẠT - WINDOWS):
+   1. Sau khi bật VPN, chạy file: "Vynex_Quan_Tri_IT.bat"
+   2. Hệ thống sẽ tự động khởi động:
+      - Vynex Client Engine (nền tảng điều khiển)
+      - Bảng Điều Khiển Quản Trị Vynex Manager
+   3. Đăng nhập:
+      - Tài khoản: dat
+      - Mật khẩu: 123
+   4. Điều khiển máy nhân viên Mai:
+      - Vào mục "Quản lý thiết bị"
+      - Chọn thiết bị của Mai (IP: 10.13.13.3) -> Bấm "Kết Nối Ngay"
+      - Hệ thống tự động đục lỗ NAT (P2P UDP) hoặc chuyển tiếp qua Relay Server VPS (10.13.13.1:21117).
+
+------------------------------------------------------------------------
+
+C. DÀNH CHO MÁY NHÂN VIÊN WINDOWS:
+   1. Chạy file: "Vynex_Nhan_Vien.bat"
+   2. Cửa sổ Vynex Client sẽ hiện mã ID và Mật khẩu dùng một lần (OTP).
+   3. Cung cấp mã ID và Mật khẩu cho IT để nhận hỗ trợ từ xa.
+
+------------------------------------------------------------------------
+
+D. KHỞI CHẠY CHUNG:
+   - Bạn có thể chạy file "run_vynex.bat" và chọn [1] hoặc [2] theo nhu cầu.
 
 ========================================================================
