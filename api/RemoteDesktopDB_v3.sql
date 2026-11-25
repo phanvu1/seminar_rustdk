@@ -141,6 +141,7 @@ CREATE TABLE SupportRequests (
     completed_at DATETIME NULL,
     rating TINYINT NULL,
     feedback TEXT NULL,
+    declined_it_ids VARCHAR(255) NULL DEFAULT '',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT FK_Support_Employee FOREIGN KEY (employee_id) REFERENCES Users(user_id),

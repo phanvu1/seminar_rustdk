@@ -14,6 +14,7 @@ class SupportRequestModel {
   final String? assignedItName;
   final int? rating; // 1 to 5
   final String? feedback;
+  final List<int> declinedItIds; // Danh sách ID kỹ thuật viên IT đã từ chối tiếp nhận
   final DateTime createdAt;
   final DateTime? acceptedAt;
   final DateTime? completedAt;
@@ -34,12 +35,23 @@ class SupportRequestModel {
     this.assignedItName,
     this.rating,
     this.feedback,
+    this.declinedItIds = const [],
     required this.createdAt,
     this.acceptedAt,
     this.completedAt,
   });
 
   factory SupportRequestModel.fromJson(Map<String, dynamic> json) {
+    List<int> parsedDeclined = [];
+    if (json['declined_it_ids'] != null) {
+      final str = json['declined_it_ids'].toString();
+      parsedDeclined = str
+          .split(',')
+          .map((s) => int.tryParse(s.trim()) ?? 0)
+          .where((id) => id > 0)
+          .toList();
+    }
+
     return SupportRequestModel(
       requestId: json['request_id'] is int ? json['request_id'] : int.tryParse(json['request_id'].toString()) ?? 0,
       employeeId: json['employee_id'] is int ? json['employee_id'] : int.tryParse(json['employee_id'].toString()) ?? 0,
@@ -56,6 +68,7 @@ class SupportRequestModel {
       assignedItName: json['assigned_it_name'],
       rating: json['rating'] is int ? json['rating'] : int.tryParse(json['rating']?.toString() ?? ''),
       feedback: json['feedback'],
+      declinedItIds: parsedDeclined,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'].toString()) : DateTime.now(),
       acceptedAt: json['accepted_at'] != null ? DateTime.parse(json['accepted_at'].toString()) : null,
       completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at'].toString()) : null,
@@ -76,6 +89,7 @@ class SupportRequestModel {
       'assigned_it_id': assignedItId,
       'rating': rating,
       'feedback': feedback,
+      'declined_it_ids': declinedItIds.join(','),
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -89,6 +103,7 @@ class SupportRequestModel {
     DateTime? completedAt,
     int? rating,
     String? feedback,
+    List<int>? declinedItIds,
   }) {
     return SupportRequestModel(
       requestId: requestId,
@@ -106,6 +121,7 @@ class SupportRequestModel {
       assignedItName: assignedItName ?? this.assignedItName,
       rating: rating ?? this.rating,
       feedback: feedback ?? this.feedback,
+      declinedItIds: declinedItIds ?? this.declinedItIds,
       createdAt: createdAt,
       acceptedAt: acceptedAt ?? this.acceptedAt,
       completedAt: completedAt ?? this.completedAt,

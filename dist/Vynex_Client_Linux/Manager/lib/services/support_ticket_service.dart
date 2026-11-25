@@ -147,20 +147,44 @@ class SupportTicketService extends ChangeNotifier {
     return false;
   }
 
-  // IT Staff rejects ticket
-  Future<bool> rejectTicket(int requestId, String reason) async {
+  // IT Staff or Admin rejects ticket
+  Future<bool> rejectTicket(
+    int requestId, 
+    String reason, {
+    int? itUserId, 
+    bool isAdmin = false,
+  }) async {
     final idx = _tickets.indexWhere((t) => t.requestId == requestId);
     if (idx != -1) {
-      _tickets[idx] = _tickets[idx].copyWith(
-        status: 'rejected',
-        feedback: 'Lý do từ chối: $reason',
-      );
+      if (isAdmin || itUserId == null) {
+        // Admin từ chối toàn diện: chuyển sang 'rejected'
+        _tickets[idx] = _tickets[idx].copyWith(
+          status: 'rejected',
+          feedback: 'Lý do từ chối: $reason',
+        );
+      } else {
+        // IT Staff từ chối tiếp nhận cá nhân: thêm itUserId vào declinedItIds, GIỮ NGUYÊN status='pending' cho IT khác
+        final currentDeclined = List<int>.from(_tickets[idx].declinedItIds);
+        if (!currentDeclined.contains(itUserId)) {
+          currentDeclined.add(itUserId);
+        }
+        _tickets[idx] = _tickets[idx].copyWith(
+          declinedItIds: currentDeclined,
+          feedback: 'IT #$itUserId từ chối tiếp nhận',
+        );
+      }
+
       final mockIdx = MockDataService().supportRequests.indexWhere((t) => t.requestId == requestId);
       if (mockIdx != -1) {
         MockDataService().supportRequests[mockIdx] = _tickets[idx];
       }
       notifyListeners();
-      await ApiService().rejectSupportRequest(requestId, reason);
+      await ApiService().rejectSupportRequest(
+        requestId, 
+        reason, 
+        itUserId: itUserId, 
+        isAdmin: isAdmin,
+      );
       return true;
     }
     return false;

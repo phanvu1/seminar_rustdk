@@ -755,7 +755,8 @@ def get_support_requests(db: Session = Depends(get_db)):
         query = text("""
             SELECT sr.request_id, sr.employee_id, u.full_name as emp_name, sr.device_id, d.device_name, d.rustdesk_id,
                    sr.title, sr.description, sr.client_password, sr.priority, sr.status, sr.assigned_it_id, it.full_name as it_name,
-                   sr.rating, sr.feedback, sr.created_at, sr.accepted_at, sr.completed_at
+                   sr.rating, sr.feedback, sr.created_at, sr.accepted_at, sr.completed_at,
+                   IFNULL(sr.declined_it_ids, '') as declined_it_ids
             FROM SupportRequests sr
             LEFT JOIN Users u ON sr.employee_id = u.user_id
             LEFT JOIN Devices d ON sr.device_id = d.device_id
@@ -771,7 +772,8 @@ def get_support_requests(db: Session = Depends(get_db)):
             "assigned_it_id": r[11], "assigned_it_name": r[12],
             "rating": r[13], "feedback": r[14],
             "created_at": str(r[15]), "accepted_at": str(r[16]) if r[16] else None,
-            "completed_at": str(r[17]) if r[17] else None
+            "completed_at": str(r[17]) if r[17] else None,
+            "declined_it_ids": r[18] if len(r) > 18 and r[18] else ""
         } for r in rows]}
     except Exception as e:
         return {"data": [], "error": str(e)}
@@ -864,32 +866,58 @@ def accept_support_request(id: int, it_id: Optional[int] = None, current_user: d
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/support-requests/{id}/reject")
-def reject_support_request(id: int, reason: Optional[str] = "Không thể xử lý", db: Session = Depends(get_db)):
-    """Từ chối yêu cầu hỗ trợ"""
+def reject_support_request(
+    id: int, 
+    reason: Optional[str] = "Không thể xử lý", 
+    it_id: Optional[int] = None, 
+    is_admin: bool = False, 
+    db: Session = Depends(get_db)
+):
+    """Từ chối yêu cầu hỗ trợ. Nếu IT từ chối, chỉ ghi nhận IT từ chối để ticket vẫn chờ IT khác tiếp nhận."""
     try:
-        query = text("UPDATE SupportRequests SET status = 'rejected', feedback = :r WHERE request_id = :id")
-        db.execute(query, {"id": id, "r": reason})
-        db.commit()
+        if is_admin or not it_id:
+            # Admin từ chối toàn diện: chuyển sang 'rejected' và thông báo cho nhân viên
+            query = text("UPDATE SupportRequests SET status = 'rejected', feedback = :r WHERE request_id = :id")
+            db.execute(query, {"id": id, "r": reason})
+            db.commit()
 
-        # Gửi thông báo cho nhân viên rằng ticket đã bị từ chối
-        try:
-            emp_row = db.execute(text("SELECT employee_id, title FROM SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
-            if emp_row:
-                emp_id, title = emp_row
-                db.execute(text("""
-                    INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
-                    VALUES (:uid, :t, :c, 'support_request', :ref, 0, CURRENT_TIMESTAMP)
-                """), {
-                    "uid": emp_id,
-                    "t": f"Yêu cầu #{id} bị từ chối",
-                    "c": f"Kỹ thuật viên IT đã từ chối yêu cầu \"{title}\". Lý do: {reason}",
-                    "ref": id
-                })
-                db.commit()
-        except Exception:
-            pass
+            # Gửi thông báo cho nhân viên rằng ticket đã bị từ chối
+            try:
+                emp_row = db.execute(text("SELECT employee_id, title FROM SupportRequests WHERE request_id = :id"), {"id": id}).fetchone()
+                if emp_row:
+                    emp_id, title = emp_row
+                    db.execute(text("""
+                        INSERT INTO Notifications (user_id, title, content, type, reference_id, is_read, created_at)
+                        VALUES (:uid, :t, :c, 'support_request', :ref, 0, CURRENT_TIMESTAMP)
+                    """), {
+                        "uid": emp_id,
+                        "t": f"Yêu cầu #{id} bị từ chối",
+                        "c": f"Quản trị viên đã từ chối yêu cầu \"{title}\". Lý do: {reason}",
+                        "ref": id
+                    })
+                    db.commit()
+            except Exception:
+                pass
 
-        return {"message": f"Đã từ chối ticket #{id}"}
+            return {"message": f"Admin đã từ chối ticket #{id}"}
+        else:
+            # Kỹ thuật viên IT từ chối tiếp nhận cá nhân: Thêm it_id vào declined_it_ids, giữ nguyên status='pending' cho IT khác
+            it_tag = f"{it_id},"
+            query = text("""
+                UPDATE SupportRequests 
+                SET declined_it_ids = IF(declined_it_ids LIKE :check_tag, declined_it_ids, CONCAT(IFNULL(declined_it_ids, ''), :it_str))
+                WHERE request_id = :id
+            """)
+            db.execute(query, {
+                "id": id, 
+                "check_tag": f"%{it_tag}%", 
+                "it_str": it_tag
+            })
+            db.commit()
+
+            return {
+                "message": f"Kỹ thuật viên #{it_id} đã từ chối tiếp nhận ticket #{id}. Yêu cầu vẫn ở trạng thái chờ cho IT khác."
+            }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))

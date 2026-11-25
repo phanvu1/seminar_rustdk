@@ -547,6 +547,10 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
       }
       if (role == UserRole.it) {
         // IT chỉ thấy ticket chưa ai nhận (pending) HOẶC ticket đã được giao/nhận bởi chính IT này
+        // Nếu IT này đã từ chối tiếp nhận (ID nằm trong declinedItIds) thì ẩn đi với IT này
+        if (t.declinedItIds.contains(auth.currentUser.userId)) {
+          return false;
+        }
         return t.status == 'pending' || t.assignedItId == auth.currentUser.userId;
       }
       // Admin thấy toàn bộ ticket
@@ -906,11 +910,19 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                               ],
                               OutlinedButton(
                                 onPressed: () async {
-                                  await ticketService.rejectTicket(ticket.requestId, 'Không thuộc phạm vi hỗ trợ');
+                                  final isAdmin = auth.currentUser.role == UserRole.admin || auth.activeRole == UserRole.admin;
+                                  await ticketService.rejectTicket(
+                                    ticket.requestId,
+                                    'Không thuộc phạm vi hỗ trợ',
+                                    itUserId: auth.currentUser.userId,
+                                    isAdmin: isAdmin,
+                                  );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Đã từ chối yêu cầu hỗ trợ #${ticket.requestId}!'),
+                                        content: Text(isAdmin
+                                            ? 'Admin đã từ chối yêu cầu #${ticket.requestId} trên toàn hệ thống!'
+                                            : 'Bạn đã từ chối yêu cầu #${ticket.requestId}. Yêu cầu vẫn chờ các IT khác tiếp nhận!'),
                                         backgroundColor: const Color(0xFFEF4444),
                                       ),
                                     );

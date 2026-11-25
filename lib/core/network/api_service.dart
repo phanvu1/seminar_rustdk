@@ -493,9 +493,18 @@ class ApiService extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> rejectSupportRequest(int requestId, String reason) async {
+  Future<bool> rejectSupportRequest(
+    int requestId, 
+    String reason, {
+    int? itUserId, 
+    bool isAdmin = false,
+  }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/api/support-requests/$requestId/reject?reason=${Uri.encodeComponent(reason)}');
+      var urlStr = '$_baseUrl/api/support-requests/$requestId/reject?reason=${Uri.encodeComponent(reason)}&is_admin=$isAdmin';
+      if (itUserId != null) {
+        urlStr += '&it_id=$itUserId';
+      }
+      final uri = Uri.parse(urlStr);
       final res = await http.put(uri, headers: _buildHeaders()).timeout(AppConstants.apiTimeout);
       if (res.statusCode == 200) {
         _isBackendConnected = true;
