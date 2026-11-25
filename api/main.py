@@ -220,6 +220,11 @@ class SupportRequestRate(BaseModel):
     rating: int  # 1 to 5
     feedback: Optional[str] = ""
 
+class SupportRequestReject(BaseModel):
+    reason: Optional[str] = "Không thể xử lý"
+    it_id: Optional[int] = None
+    is_admin: Optional[bool] = False
+
 class PermissionGrant(BaseModel):
     user_id: int        # IT User ID
     device_id: int      # Target Device ID
@@ -868,17 +873,24 @@ def accept_support_request(id: int, it_id: Optional[int] = None, current_user: d
 @app.put("/api/support-requests/{id}/reject")
 def reject_support_request(
     id: int, 
-    reason: Optional[str] = "Không thể xử lý", 
+    req: Optional[SupportRequestReject] = None,
+    reason: Optional[str] = None, 
     it_id: Optional[int] = None, 
-    is_admin: bool = False, 
+    is_admin: Optional[bool] = None, 
     db: Session = Depends(get_db)
 ):
     """Từ chối yêu cầu hỗ trợ. Nếu IT từ chối, chỉ ghi nhận IT từ chối để ticket vẫn chờ IT khác tiếp nhận."""
+    eff_reason = (req.reason if req and req.reason else None) or reason or "Không thể xử lý"
+    eff_it_id = (req.it_id if req and req.it_id is not None else None) or it_id
+    eff_is_admin = (req.is_admin if req and req.is_admin is not None else None) if is_admin is not None else is_admin
+    if eff_is_admin is None:
+        eff_is_admin = False
+
     try:
-        if is_admin or not it_id:
+        if eff_is_admin or not eff_it_id:
             # Admin từ chối toàn diện: chuyển sang 'rejected' và thông báo cho nhân viên
             query = text("UPDATE SupportRequests SET status = 'rejected', feedback = :r WHERE request_id = :id")
-            db.execute(query, {"id": id, "r": reason})
+            db.execute(query, {"id": id, "r": eff_reason})
             db.commit()
 
             # Gửi thông báo cho nhân viên rằng ticket đã bị từ chối
@@ -892,7 +904,7 @@ def reject_support_request(
                     """), {
                         "uid": emp_id,
                         "t": f"Yêu cầu #{id} bị từ chối",
-                        "c": f"Quản trị viên đã từ chối yêu cầu \"{title}\". Lý do: {reason}",
+                        "c": f"Quản trị viên đã từ chối yêu cầu \"{title}\". Lý do: {eff_reason}",
                         "ref": id
                     })
                     db.commit()
@@ -902,7 +914,7 @@ def reject_support_request(
             return {"message": f"Admin đã từ chối ticket #{id}"}
         else:
             # Kỹ thuật viên IT từ chối tiếp nhận cá nhân: Thêm it_id vào declined_it_ids, giữ nguyên status='pending' cho IT khác
-            it_tag = f"{it_id},"
+            it_tag = f"{eff_it_id},"
             query = text("""
                 UPDATE SupportRequests 
                 SET declined_it_ids = IF(declined_it_ids LIKE :check_tag, declined_it_ids, CONCAT(IFNULL(declined_it_ids, ''), :it_str))
@@ -916,7 +928,7 @@ def reject_support_request(
             db.commit()
 
             return {
-                "message": f"Kỹ thuật viên #{it_id} đã từ chối tiếp nhận ticket #{id}. Yêu cầu vẫn ở trạng thái chờ cho IT khác."
+                "message": f"Kỹ thuật viên #{eff_it_id} đã từ chối tiếp nhận ticket #{id}. Yêu cầu vẫn ở trạng thái chờ cho IT khác."
             }
     except Exception as e:
         db.rollback()
